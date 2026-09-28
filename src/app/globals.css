@@ -1,0 +1,154 @@
+@import "tailwindcss";
+
+/*
+  HMS Returnly — back-of-house tool used on phones mid-shift and on
+  front-desk PCs. Cool, quiet base; the one memorable element is the manila
+  luggage tag that carries each item code, matching the physical tag staff
+  write it on.
+*/
+
+@theme {
+  --font-sans: "Public Sans Variable", system-ui, sans-serif;
+
+  --color-ink: #17252e;
+  --color-muted: #56656f;
+  --color-paper: #f4f6f7;
+  --color-surface: #ffffff;
+  --color-line: #d8dee2;
+
+  --color-teal: #0b6468;
+  --color-teal-dark: #084c4f;
+  --color-teal-soft: #e3f0f0;
+
+  --color-tag: #ead7a1;
+  --color-tag-edge: #c9b27a;
+  --color-tag-ink: #3b2f12;
+
+  --color-attention: #9a4a06;
+  --color-attention-soft: #fdf0dc;
+  --color-danger: #b42318;
+  --color-danger-soft: #fde8e6;
+  --color-done: #1d6b45;
+  --color-done-soft: #dff2e7;
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "tnum" 1;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-teal);
+  outline-offset: 2px;
+}
+
+@layer components {
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    padding: 0 1.1rem;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    font-size: 0.95rem;
+    transition: background-color 120ms;
+  }
+  .btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+  .btn-primary {
+    background: var(--color-teal);
+    color: #fff;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: var(--color-teal-dark);
+  }
+  .btn-secondary {
+    background: var(--color-surface);
+    color: var(--color-ink);
+    border: 1px solid var(--color-line);
+  }
+  .btn-secondary:hover:not(:disabled) {
+    background: var(--color-paper);
+  }
+  .btn-danger {
+    background: var(--color-surface);
+    color: var(--color-danger);
+    border: 1px solid var(--color-danger);
+  }
+
+  .field {
+    width: 100%;
+    min-height: 2.75rem;
+    padding: 0.55rem 0.75rem;
+    border: 1px solid var(--color-line);
+    border-radius: 0.5rem;
+    background: var(--color-surface);
+    font-size: 1rem; /* 16px stops Android/iOS zooming into inputs */
+  }
+  .field:focus {
+    border-color: var(--color-teal);
+    outline: none;
+    box-shadow: 0 0 0 3px var(--color-teal-soft);
+  }
+  .label {
+    display: block;
+    margin-bottom: 0.35rem;
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+  .hint {
+    font-size: 0.85rem;
+    color: var(--color-muted);
+  }
+
+  .panel {
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-radius: 0.75rem;
+  }
+
+  /* The luggage tag: notched left edge with a punched hole. */
+  .tag {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.7rem 0.2rem 1.35rem;
+    background:
+      radial-gradient(circle at 0.62rem 50%, var(--color-paper) 0.2rem, var(--color-tag-edge) 0.21rem, var(--color-tag-edge) 0.28rem, transparent 0.29rem),
+      var(--color-tag);
+    color: var(--color-tag-ink);
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    clip-path: polygon(0.55rem 0, 100% 0, 100% 100%, 0.55rem 100%, 0 calc(100% - 0.55rem), 0 0.55rem);
+    white-space: nowrap;
+  }
+  .tag-lg {
+    font-size: 1.5rem;
+    padding: 0.45rem 1rem 0.45rem 2rem;
+    background:
+      radial-gradient(circle at 0.9rem 50%, var(--color-paper) 0.3rem, var(--color-tag-edge) 0.31rem, var(--color-tag-edge) 0.4rem, transparent 0.41rem),
+      var(--color-tag);
+    clip-path: polygon(0.8rem 0, 100% 0, 100% 100%, 0.8rem 100%, 0 calc(100% - 0.8rem), 0 0.8rem);
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.1rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+}
