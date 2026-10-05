@@ -1,6 +1,7 @@
 'use server'
 
 import { redirect } from 'next/navigation'
+import { signInDestination } from '@/lib/sign-in-destination'
 import { createClient } from '@/lib/supabase/server'
 import { USERNAME_PATTERN, usernameToEmail } from '@/lib/auth'
 import type { ActionState } from '@/lib/types'
@@ -32,5 +33,5 @@ export async function signIn(_prev: ActionState, formData: FormData): Promise<Ac
     return { error: 'This account is not active. Ask a manager.' }
   }
 
-  redirect('/items')
+  redirect(signInDestination(formData.get('next')))
 }

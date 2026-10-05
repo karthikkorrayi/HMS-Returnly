@@ -1,3 +1,4 @@
+import { signInDestination } from '@/lib/sign-in-destination'
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
@@ -7,6 +8,8 @@ const PUBLIC_PATHS = ['/login']
 // visitors to /login. This is an optimistic check only — pages and server
 // actions verify the staff member again before doing anything.
 export async function updateSession(request: NextRequest) {
+  // Public preview uses bundled sample data, not hotel records.
+  if (request.nextUrl.pathname === '/') return NextResponse.next()
   let response = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -37,6 +40,7 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     url.search = ''
+    url.searchParams.set('next', signInDestination(request.nextUrl.pathname))
     return NextResponse.redirect(url)
   }
 
