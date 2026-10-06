@@ -30,6 +30,16 @@ logged → stored → matched → guest_contacted → awaiting_collection → re
 stored / matched / guest_contacted → disposed | donated   (manager, after retention date, with witness)
 ```
 
+## Stay log and room checks
+
+Until the PMS can be connected, front desk keeps a stay log in Returnly and housekeeping records a check of every room after departure. Any item found in a room can then be traced to the stays most likely to own it. API details: [docs/backend-api.md](docs/backend-api.md).
+
+- **Rooms** (everyone): each room is *Occupied*, *Due out*, *Needs check*, *Check overdue* or *Ready*. After a departure, housekeeping opens the room and taps **Clean – no items found** or **Items found – log them** (which opens the item form linked to that check). No guest details are shown to housekeeping.
+- **Stays** (front office, managers): check guests in and out, or import the PMS arrivals/in-house/departures report or a Google Sheet saved as CSV ([template](public/stays-import-template.csv)). Re-importing the same file is safe; corrections are logged. Guest surnames are stored only so a guest can later prove a booking; nobody can read them through the app or the API.
+- **Likely owners** (front office, managers, on each item found in a room): stays in that room within the trace window, ranked with reasons. Each clean check since a guest left lowers their score, less so if the item was somewhere hard to see. **Add as possible owner** feeds the existing confirm → contact → handover flow. Staff decide; the score never does.
+- **Settings** (managers): trace window, room check deadline, how long to keep stays and unclaimed items.
+- **Retention:** `purge_expired_stays()` deletes stays older than the stay retention period. Schedule it daily (Setup, step 7).
+
 ## Setup
 
 1. **Create a Supabase project** in the **London (eu-west-2)** region, under an organisation rather than a personal account.
@@ -43,12 +53,16 @@ stored / matched / guest_contacted → disposed | donated   (manager, after rete
    npm install
    npm run create-staff -- --property DEMO --username demo.manager --name "Demo Manager" --role manager
    ```
-6. **Run it:** `npm run dev`, then open it on a phone on the same network at `http://<your-computer-ip>:3000`. Camera capture needs HTTPS on most phones, so for photo testing deploy a preview (for example to Vercel, region `lhr1`) or use a tunnel.
+6. **Run it:** `npm run dev` for the laptop. To try it on a phone on the same Wi-Fi, set `DEV_LAN_HOST` in `.env.local` to your computer's LAN IP, run `npm run dev:lan`, and open `http://<that-ip>:3000` on the phone. For a production-like test, `npm run build` then `npm run start:lan`.
+7. **Schedule the stay clean-up** (once): Database → Extensions → enable `pg_cron`, then in the SQL editor run
+   ```sql
+   select cron.schedule('purge-expired-stays', '30 3 * * *', $$select public.purge_expired_stays()$$);
+   ```
 
 ### Real hotel data
 
 Build and demo with the seeded `DEMO` property. Before real use:
-- get written approval from the hotel's general manager for the data this holds (staff names, item photos, reservation numbers); and
+- get written approval from the hotel's general manager for the data this holds (staff names, item photos, reservation numbers and guest surnames in the stay log); and
 - replace the demo property, rooms and storage locations with the hotel's own, and set the retention period to the hotel's policy.
 
 ## Checks
@@ -56,6 +70,7 @@ Build and demo with the seeded `DEMO` property. Before real use:
 ```bash
 npm run lint
 npm run typecheck
+npm test          # unit tests in tests/
 npm run test:db   # applies migrations in an in-memory Postgres and tests every role and workflow rule
 npm run build
 ```
@@ -64,8 +79,9 @@ The same checks run in GitHub Actions on every push and pull request.
 
 ## Not built yet
 
-- Guest-facing "I lost something" enquiry form (QR code or link)
-- Screens for managers to edit rooms, storage locations and the retention period (use the SQL editor for now)
+- Customer-facing lost property assistant (chat, booking check by confirmation number + surname, case tracking) — endpoints designed in [docs/backend-api.md](docs/backend-api.md)
+- Automatic PMS sync (the stay import is the manual bridge; `stays.source = 'pms'` is reserved for it)
+- Screens for managers to edit rooms and storage locations (use the SQL editor for now)
 - Editing an item's description after logging
 - Removing photos from storage automatically once an item is closed
 - Offline logging for rooms with poor Wi-Fi

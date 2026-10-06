@@ -29,6 +29,9 @@ export type Property = {
   inn_code: string
   name: string
   retention_days: number
+  trace_window_days: number
+  stay_retention_days: number
+  check_due_hours: number
 }
 
 export type StorageLocation = {
@@ -56,6 +59,74 @@ export type LostItem = {
   storage_location_id: string | null
   dispose_after: string
   created_at: string
+  room_check_id: string | null
+  found_spot: string | null
+  spot_hidden: boolean
+}
+
+// --- Stays, room checks, tracing (migrations 0005–0006) ----------------------
+
+export type RoomStatus = 'occupied' | 'due_out' | 'needs_check' | 'check_overdue' | 'ready'
+export type RoomCheckOutcome = 'clean' | 'items_found'
+export type RoomCheckType = 'departure' | 'recheck' | 'deep_clean'
+export type StayStatus = 'in_house' | 'departed' | 'cancelled'
+
+export type RoomBoardRow = {
+  room_number: string
+  floor: string | null
+  status: RoomStatus
+  stay_id: string | null
+  departed_at: string | null
+  last_checked_at: string | null
+  last_check_outcome: RoomCheckOutcome | null
+}
+
+// guest_surname is deliberately absent: it is not readable through the API.
+export type Stay = {
+  id: string
+  room_number: string
+  reservation_ref: string
+  check_in_date: string
+  check_out_date: string
+  checked_in_at: string | null
+  checked_out_at: string | null
+  status: StayStatus
+  source: 'manual' | 'import' | 'pms'
+  note: string | null
+}
+
+export type RoomCheck = {
+  id: string
+  room_number: string
+  stay_id: string | null
+  check_type: RoomCheckType
+  outcome: RoomCheckOutcome
+  checked_by: string
+  checked_at: string
+  note: string | null
+}
+
+export type TraceRow = {
+  stay_id: string
+  reservation_ref: string
+  check_in_date: string
+  check_out_date: string
+  score: number
+  reasons: string[]
+}
+
+export const ROOM_STATUS_LABEL: Record<RoomStatus, string> = {
+  occupied: 'Occupied',
+  due_out: 'Due out',
+  needs_check: 'Needs check',
+  check_overdue: 'Check overdue',
+  ready: 'Ready',
+}
+
+export const ROOM_CHECK_TYPE_LABEL: Record<RoomCheckType, string> = {
+  departure: 'After departure',
+  recheck: 'Recheck',
+  deep_clean: 'Deep clean',
 }
 
 export type GuestCandidate = {

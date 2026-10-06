@@ -22,7 +22,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
         </div>
 
-        <Nav isManager={staff.role === 'manager'} variant="rail" />
+        <Nav role={staff.role} variant="rail" />
 
         <div className="mt-auto border-t border-line pt-4">
           <p className="font-semibold">{staff.display_name}</p>
@@ -53,7 +53,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <main className="mx-auto w-full max-w-7xl flex-1 px-4 pb-28 pt-6 md:px-7 md:pb-10 md:pt-8">
           {children}
         </main>
-        <Nav isManager={staff.role === 'manager'} variant="bar" />
+        <Nav role={staff.role} variant="bar" />
       </div>
     </div>
   )

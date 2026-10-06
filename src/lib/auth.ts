@@ -37,7 +37,7 @@ export const getSession = cache(async (): Promise<Session | null> => {
 
   const { data: property } = await supabase
     .from('properties')
-    .select('id, inn_code, name, retention_days')
+    .select('id, inn_code, name, retention_days, trace_window_days, stay_retention_days, check_due_hours')
     .eq('id', staff.property_id)
     .single<Property>()
   if (!property) return null

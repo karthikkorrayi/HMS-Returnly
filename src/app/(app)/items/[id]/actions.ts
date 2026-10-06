@@ -147,3 +147,12 @@ export async function deletePhoto(_p: ActionState, f: FormData) {
     return { error }
   })
 }
+
+// Adds a traced stay (from "Likely owners") as a possible owner.
+export async function addCandidateFromStay(_p: ActionState, f: FormData) {
+  const stayId = str(f, 'stay_id')
+  if (!UUID.test(stayId)) return { error: 'Unknown stay.' }
+  return withItem(f, ({ supabase, itemId }) =>
+    supabase.rpc('add_candidate_from_stay', { p_item_id: itemId, p_stay_id: stayId, p_note: optional(f, 'note') })
+  )
+}

@@ -21,6 +21,8 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+      - name: Unit tests
+        run: npm test
       - name: Database rules (migrations + RLS + workflow)
         run: npm run test:db
       - run: npm run build

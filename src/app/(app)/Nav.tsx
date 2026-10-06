@@ -3,11 +3,15 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import ReturnlyIcon from '@/components/ReturnlyIcon'
+import type { StaffRole } from '@/lib/types'
 
 type NavItem = {
   href: string
   label: string
-  icon: 'grid' | 'plus' | 'people'
+  icon: 'grid' | 'plus' | 'people' | 'door' | 'calendar' | 'gear'
+  // Shown in the phone bottom bar (max 5); the rest are desktop-rail only
+  // and reachable from other pages on phones.
+  bar: boolean
 }
 
 function Icon({ name }: { name: NavItem['icon'] }) {
@@ -27,18 +31,25 @@ function Icon({ name }: { name: NavItem['icon'] }) {
 }
 
 export default function Nav({
-  isManager,
+  role,
   variant,
 }: {
-  isManager: boolean
+  role: StaffRole
   variant: 'rail' | 'bar'
 }) {
   const pathname = usePathname()
-  const items: NavItem[] = [
-    { href: '/items', label: 'Dashboard', icon: 'grid' },
-    { href: '/items/new', label: 'Log item', icon: 'plus' },
-    ...(isManager ? [{ href: '/staff', label: 'Staff', icon: 'people' as const }] : []),
+  const desk = role === 'front_office' || role === 'manager'
+  const manager = role === 'manager'
+
+  const all: NavItem[] = [
+    { href: '/items', label: 'Dashboard', icon: 'grid', bar: true },
+    { href: '/rooms', label: 'Rooms', icon: 'door', bar: true },
+    { href: '/items/new', label: 'Log item', icon: 'plus', bar: true },
+    ...(desk ? [{ href: '/stays', label: 'Stays', icon: 'calendar' as const, bar: true }] : []),
+    ...(manager ? [{ href: '/staff', label: 'Staff', icon: 'people' as const, bar: true }] : []),
+    ...(manager ? [{ href: '/settings', label: 'Settings', icon: 'gear' as const, bar: false }] : []),
   ]
+  const items = variant === 'bar' ? all.filter((i) => i.bar) : all
 
   function isActive(href: string) {
     return href === '/items'

@@ -4,6 +4,15 @@ export const MAX_PHOTOS = 3
 const MAX_EDGE = 1600
 const QUALITY = 0.8
 
+// crypto.randomUUID only exists on HTTPS/localhost. Phones testing against a
+// dev server on http://<lan-ip>:3000 don't have it, so fall back to
+// getRandomValues, which works everywhere.
+function randomId(): string {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+}
+
 // Re-encodes a camera photo as a JPEG no larger than 1600px on its longest
 // side. Drawing through a canvas drops all EXIF metadata, including GPS.
 export async function compressPhoto(file: File): Promise<Blob> {
@@ -40,7 +49,7 @@ export async function uploadItemPhotos(
   for (const file of opts.files) {
     try {
       const blob = await compressPhoto(file)
-      const path = `${opts.propertyId}/${opts.itemId}/${crypto.randomUUID()}.jpg`
+      const path = `${opts.propertyId}/${opts.itemId}/${randomId()}.jpg`
 
       const { error: uploadError } = await supabase.storage
         .from('item-photos')

@@ -20,6 +20,7 @@ import { StatusBadge, TierBadge } from '@/components/Badges'
 import ActionForm from '@/components/ActionForm'
 import NextStep, { ItemTools } from './NextStep'
 import Candidates from './Candidates'
+import LikelyOwners from './LikelyOwners'
 import AddPhotos from './AddPhotos'
 import { deletePhoto } from './actions'
 
@@ -75,6 +76,9 @@ export default async function ItemPage({
 
   const facts: [string, React.ReactNode][] = [
     ['Found in', where],
+    ...(item.found_spot
+      ? [['Where', `${item.found_spot}${item.spot_hidden ? ' (hard to see)' : ''}`] as [string, string]]
+      : []),
     ['Found', formatDateTime(item.found_at)],
     ['Found by', names[item.found_by] ?? '—'],
     ['Type', CATEGORY_LABEL[item.category] ?? item.category],
@@ -194,6 +198,10 @@ export default async function ItemPage({
               />
             )}
           </section>
+
+          {manage && (
+            <LikelyOwners item={item} candidates={candidates} traceWindowDays={property.trace_window_days} />
+          )}
 
           {manage && <Candidates item={item} candidates={candidates} names={names} />}
 

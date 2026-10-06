@@ -17,10 +17,14 @@ export default function LogItemForm({
   propertyId,
   userId,
   rooms,
+  initialRoom,
+  roomCheckId,
 }: {
   propertyId: string
   userId: string
   rooms: string[]
+  initialRoom?: string
+  roomCheckId?: string
 }) {
   const router = useRouter()
   const roomSet = useMemo(() => new Set(rooms.map((r) => r.toUpperCase())), [rooms])
@@ -70,6 +74,9 @@ export default function LogItemForm({
         brand: get('brand') || null,
         colour: get('colour') || null,
         value_tier: tier,
+        room_check_id: areaType === 'room' && roomCheckId ? roomCheckId : null,
+        found_spot: areaType === 'room' ? get('found_spot') || null : null,
+        spot_hidden: areaType === 'room' && form.get('spot_hidden') === 'on',
       })
       .select('id')
       .single()
@@ -108,6 +115,7 @@ export default function LogItemForm({
               role="radio"
               aria-checked={areaType === t}
               onClick={() => setAreaType(t)}
+              disabled={Boolean(roomCheckId) && t !== 'room'}
               className={`btn ${areaType === t ? 'btn-primary' : 'btn-secondary'}`}
             >
               {t === 'room' ? 'Guest room' : 'Public area'}
@@ -125,6 +133,8 @@ export default function LogItemForm({
               className="field"
               inputMode="numeric"
               autoComplete="off"
+              defaultValue={initialRoom}
+              readOnly={Boolean(roomCheckId)}
               required
             />
             <datalist id="room-list">
@@ -132,6 +142,30 @@ export default function LogItemForm({
                 <option key={r} value={r} />
               ))}
             </datalist>
+            <label htmlFor="found_spot" className="label mt-4">
+              Where in the room <span className="font-normal text-muted">(optional)</span>
+            </label>
+            <input
+              id="found_spot"
+              name="found_spot"
+              list="spot-list"
+              className="field"
+              maxLength={80}
+              autoComplete="off"
+              placeholder="e.g. Behind the bedside table"
+            />
+            <datalist id="spot-list">
+              {['Bedside table', 'Behind the bedside table', 'Under the bed', 'In the bed / sheets', 'Wardrobe', 'Drawers', 'Room safe', 'Desk', 'Bathroom', 'Behind the door'].map((s) => (
+                <option key={s} value={s} />
+              ))}
+            </datalist>
+            <label className="mt-3 flex items-start gap-3">
+              <input type="checkbox" name="spot_hidden" className="mt-1 size-4 accent-teal" />
+              <span>
+                <span className="font-semibold">Hard to see</span>
+                <span className="hint block">Under or behind furniture, in bedding — somewhere a quick check could miss.</span>
+              </span>
+            </label>
           </div>
         ) : (
           <div>

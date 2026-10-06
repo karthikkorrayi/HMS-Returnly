@@ -20,6 +20,11 @@ export function formatDate(iso: string) {
   }).format(new Date(iso))
 }
 
+// The date n days before today in hotel time, as YYYY-MM-DD.
+export function hotelDaysAgo(n: number) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date(Date.now() - n * 86400000))
+}
+
 // Today's date in hotel time, as YYYY-MM-DD.
 export function hotelToday() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date())
