@@ -11,26 +11,28 @@ export async function saveSettings(_p: ActionState, f: FormData): Promise<Action
   const session = await getSession()
   if (!session || session.staff.role !== 'manager') return { error: 'Only managers can change settings.' }
 
-  const v = {
-    trace: num(f, 'trace_window_days'),
-    stays: num(f, 'stay_retention_days'),
-    check: num(f, 'check_due_hours'),
-    items: num(f, 'retention_days'),
+  const items = num(f, 'retention_days')
+  const requests = num(f, 'request_retention_days')
+  if (!Number.isInteger(items) || items < 7 || items > 730) return { error: 'Keep unclaimed items for 7 to 730 days.' }
+  if (!Number.isInteger(requests) || requests < 30 || requests > 1095) {
+    return { error: 'Keep closed enquiries for 30 to 1,095 days.' }
   }
-  if (!Number.isInteger(v.trace) || v.trace < 7 || v.trace > 120) return { error: 'Trace window: 7 to 120 days.' }
-  if (!Number.isInteger(v.stays) || v.stays < 30 || v.stays > 730) return { error: 'Keep stays for 30 to 730 days.' }
-  if (v.stays < v.trace) return { error: 'Stays must be kept at least as long as the trace window.' }
-  if (!Number.isInteger(v.check) || v.check < 1 || v.check > 48) return { error: 'Room check deadline: 1 to 48 hours.' }
-  if (!Number.isInteger(v.items) || v.items < 7 || v.items > 730) return { error: 'Keep unclaimed items for 7 to 730 days.' }
 
+  // The stay-log settings (trace window, stay retention, room check deadline)
+  // are no longer shown since Rooms and Stays were removed; their stored
+  // values are kept as they are.
+  const p = session.property
   const supabase = await createClient()
   const { error } = await supabase.rpc('update_property_settings', {
-    p_trace_window_days: v.trace,
-    p_stay_retention_days: v.stays,
-    p_check_due_hours: v.check,
-    p_retention_days: v.items,
+    p_trace_window_days: p.trace_window_days,
+    p_stay_retention_days: p.stay_retention_days,
+    p_check_due_hours: p.check_due_hours,
+    p_retention_days: items,
   })
   if (error) return { error: error.message }
+  const { error: reqError } = await supabase.rpc('update_request_settings', { p_request_retention_days: requests })
+  if (reqError) return { error: reqError.message }
+
   revalidatePath('/', 'layout')
   return { error: null, ok: true }
 }

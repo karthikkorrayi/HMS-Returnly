@@ -51,7 +51,8 @@ export default async function StaffPage() {
               <select id="new-role" name="role" className="field" defaultValue="housekeeping">
                 <option value="housekeeping">Housekeeping — logs and stores items</option>
                 <option value="front_office">Front office — matches and returns items</option>
-                <option value="manager">Manager — everything, plus staff and disposal</option>
+                <option value="support">Support — handles customer enquiries</option>
+                <option value="manager">Manager (admin) — everything, plus staff, approvals and disposal</option>
               </select>
             </div>
             <div>

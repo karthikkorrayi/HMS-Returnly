@@ -1,26 +1,35 @@
 import Link from 'next/link'
 import ReturnlyIcon from '@/components/ReturnlyIcon'
-import DashboardPreview from '@/components/DashboardPreview'
+import EnquiryChat from '@/components/enquiry/EnquiryChat'
+import { listHotels } from '@/lib/requests/public-actions'
+import { hotelToday } from '@/lib/format'
+
+// Public, no sign-in. Shows nothing from the hotel's records: customers send
+// an enquiry, staff check it, and the customer follows it with a reference.
 
 const STEPS = [
   {
-    icon: 'tag',
-    title: '01 / Log & protect',
-    description: 'Record where an item was found and store it safely. Sensitive items are kept secure, without photos.',
-  },
-  {
     icon: 'search',
-    title: '02 / Match & contact',
-    description: 'The front desk matches belongings to a reservation. Guest contact stays in your hotel’s PMS.',
+    title: 'Tell us what’s missing',
+    description: 'Describe the item in your own words, with your name and booking ID.',
   },
   {
     icon: 'shield',
-    title: '03 / Return with confidence',
-    description: 'Record collection or posting with the right checks and witnesses. Every step has a custody record.',
+    title: 'We check our records',
+    description: 'A member of staff compares your description with the items we hold. Nothing is confirmed automatically.',
+  },
+  {
+    icon: 'check',
+    title: 'Follow it with your reference',
+    description: 'See updates, answer questions from the team, and arrange collection or posting.',
   },
 ] as const
 
-export default function Home() {
+export default async function Home() {
+  // Reads cookies via the Supabase client, so this page is always rendered per request.
+  const hotels = await listHotels()
+  const today = hotelToday()
+
   return (
     <div className="overview-shell">
       <header className="border-b border-line bg-surface">
@@ -34,81 +43,80 @@ export default function Home() {
               </span>
             </span>
           </Link>
-          <Link href="/login" className="btn btn-primary">
-            Staff sign in <ReturnlyIcon name="arrow" />
-          </Link>
+          <nav aria-label="Main" className="flex items-center gap-2 sm:gap-3">
+            <Link href="/track" className="btn btn-secondary">Check an enquiry</Link>
+            <Link href="/login" className="hidden text-sm font-semibold text-teal sm:inline">Staff sign in</Link>
+          </nav>
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-12">
-        <section
-          className="overview-hero relative overflow-hidden rounded-3xl px-6 py-8 sm:px-10 sm:py-10"
-          aria-labelledby="overview-title"
-        >
-          <div className="relative z-10 max-w-2xl">
-            <p className="mb-4 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-teal-dark">
-              <span className="size-2 rounded-full bg-teal" />
-              A little care. A happy reunion.
-            </p>
-            <h1 id="overview-title" className="max-w-xl text-3xl font-bold leading-tight tracking-tight sm:text-5xl">
-              Left behind.<br />
-              <span className="text-teal">Never forgotten.</span>
+      <main className="mx-auto max-w-7xl px-4 py-5 sm:px-8 sm:py-12">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-start lg:gap-8">
+          <section className="overview-hero relative overflow-hidden rounded-3xl px-6 py-6 sm:px-10 sm:py-10" aria-labelledby="overview-title">
+            <h1 id="overview-title" className="text-2xl font-bold leading-tight tracking-tight sm:text-5xl">
+              Left something behind?
             </h1>
-            <p className="mt-4 max-w-lg text-base leading-relaxed text-muted">
-              From the first found item to the final handover. Give your hotel
-              team one clear place to keep belongings safe and get them back
-              to their guests.
+            <p className="mt-4 max-w-md text-base leading-relaxed text-muted">
+              Tell us what you’ve lost and we’ll check it against the items our team has found. You’ll get a reference
+              to follow your enquiry.
             </p>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Link href="/login?next=/items/new" className="btn btn-primary">
-                <ReturnlyIcon name="plus" />Log a found item
-              </Link>
-              <a href="#workspace-preview" className="btn btn-secondary">
-                Explore the preview <ReturnlyIcon name="arrow" />
-              </a>
-            </div>
-            <p className="mt-3 text-xs text-muted">
-              Staff sign-in required to log or manage real items.
+            <ol className="mt-8 hidden space-y-5 lg:block">
+              {STEPS.map((step, i) => (
+                <li key={step.title} className="flex gap-3">
+                  <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-teal text-sm font-bold text-white" aria-hidden>
+                    {i + 1}
+                  </span>
+                  <div>
+                    <h2 className="font-bold">{step.title}</h2>
+                    <p className="mt-1 text-sm leading-relaxed text-muted">{step.description}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+            <p className="mt-4 text-sm lg:mt-8">
+              Already sent one?{' '}
+              <Link href="/track" className="font-semibold text-teal underline">Check its status</Link>
             </p>
-          </div>
-          <div className="hero-tag hidden lg:flex" aria-hidden="true">
-            <span className="hero-tag-hole" />
-            <ReturnlyIcon name="tag" className="!size-12" />
-            <span className="mt-5 text-3xl font-bold tracking-tight">
-              Found.<br />Kept safe.<br />Returned.
-            </span>
-            <span className="mt-6 border-t border-tag-edge pt-3 text-xs font-semibold uppercase tracking-widest">
-              Every item has a story.
-            </span>
-          </div>
-        </section>
+          </section>
 
-        <DashboardPreview />
-
-        <section
-          className="mt-10 grid gap-5 border-t border-line pt-8 sm:grid-cols-3"
-          aria-label="How Returnly works"
-        >
-          {STEPS.map((step) => (
-            <div key={step.title} className="flex gap-3">
-              <span className="mt-1 text-teal"><ReturnlyIcon name={step.icon} /></span>
-              <div>
-                <h2 className="text-sm font-bold">{step.title}</h2>
-                <p className="mt-2 text-sm leading-relaxed text-muted">
-                  {step.description}
-                </p>
+          <section aria-labelledby="enquiry-title">
+            <h2 id="enquiry-title" className="sr-only">Send a lost property enquiry</h2>
+            {hotels.length === 0 ? (
+              <div className="panel p-6" role="alert">
+                <p className="font-semibold">Enquiries aren’t available right now.</p>
+                <p className="hint mt-1">Please contact the hotel directly.</p>
               </div>
-            </div>
-          ))}
-        </section>
+            ) : (
+              <EnquiryChat hotels={hotels} today={today} />
+            )}
+          </section>
+
+          {/* Phones: how it works goes after the form, so the form is reachable first. */}
+          <section aria-label="How it works" className="lg:hidden">
+            <ol className="space-y-4">
+              {STEPS.map((step, i) => (
+                <li key={step.title} className="flex gap-3">
+                  <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-teal text-sm font-bold text-white" aria-hidden>
+                    {i + 1}
+                  </span>
+                  <div>
+                    <h2 className="font-bold">{step.title}</h2>
+                    <p className="mt-1 text-sm leading-relaxed text-muted">{step.description}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </section>
+        </div>
       </main>
 
       <footer className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-5 pb-8 pt-4 text-xs text-muted sm:px-8">
-        <span>Returnly · A thoughtful home for lost property.</span>
+        <span>Returnly · Hotel lost property enquiries</span>
         <span className="flex items-center gap-2">
           <ReturnlyIcon name="shield" className="!size-4" />
-          Hotel records are available only to signed-in staff.
+          We only use your details to handle this enquiry.
         </span>
+        <Link href="/login" className="font-semibold text-teal sm:hidden">Staff sign in</Link>
       </footer>
     </div>
   )

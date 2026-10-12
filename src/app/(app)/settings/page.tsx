@@ -7,36 +7,20 @@ export default async function SettingsPage() {
 
   const fields = [
     {
-      name: 'trace_window_days',
-      label: 'Trace window (days)',
-      value: property.trace_window_days,
-      min: 7,
-      max: 120,
-      hint: 'How far back to look for possible owners of an item found in a room.',
-    },
-    {
-      name: 'check_due_hours',
-      label: 'Room check deadline (hours)',
-      value: property.check_due_hours,
-      min: 1,
-      max: 48,
-      hint: 'A departed room not checked within this time is flagged as overdue.',
-    },
-    {
-      name: 'stay_retention_days',
-      label: 'Keep stay records (days)',
-      value: property.stay_retention_days,
-      min: 30,
-      max: 730,
-      hint: 'Stays older than this are deleted. Must be at least the trace window.',
-    },
-    {
       name: 'retention_days',
       label: 'Keep unclaimed items (days)',
       value: property.retention_days,
       min: 7,
       max: 730,
       hint: 'Applies to items logged from now on. Agree this with the hotel’s lost property policy.',
+    },
+    {
+      name: 'request_retention_days',
+      label: 'Keep closed customer enquiries (days)',
+      value: property.request_retention_days,
+      min: 30,
+      max: 1095,
+      hint: 'Rejected or resolved enquiries — with the customer’s name, booking ID and messages — are deleted after this.',
     },
   ]
 

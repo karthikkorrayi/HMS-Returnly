@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { canManageItems, requireSession } from '@/lib/auth'
+import { ITEM_ROLES, canManageItems, requireSession } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { signPhotoUrls } from '@/lib/photo-urls'
 import { formatDate, formatDateTime, hotelToday } from '@/lib/format'
@@ -20,7 +20,6 @@ import { StatusBadge, TierBadge } from '@/components/Badges'
 import ActionForm from '@/components/ActionForm'
 import NextStep, { ItemTools } from './NextStep'
 import Candidates from './Candidates'
-import LikelyOwners from './LikelyOwners'
 import AddPhotos from './AddPhotos'
 import { deletePhoto } from './actions'
 
@@ -38,7 +37,7 @@ export default async function ItemPage({
   params: Promise<{ id: string }>
   searchParams: Promise<{ logged?: string; photos_failed?: string }>
 }) {
-  const { staff: me, property } = await requireSession()
+  const { staff: me, property } = await requireSession(ITEM_ROLES)
   const { id } = await params
   const flags = await searchParams
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound()
@@ -198,10 +197,6 @@ export default async function ItemPage({
               />
             )}
           </section>
-
-          {manage && (
-            <LikelyOwners item={item} candidates={candidates} traceWindowDays={property.trace_window_days} />
-          )}
 
           {manage && <Candidates item={item} candidates={candidates} names={names} />}
 

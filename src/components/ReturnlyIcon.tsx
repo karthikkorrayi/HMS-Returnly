@@ -1,7 +1,7 @@
 type IconName =
   | 'tag' | 'grid' | 'plus' | 'arrow' | 'search'
   | 'box' | 'check' | 'shield' | 'clock' | 'eye' | 'eye-off'
-  | 'door' | 'calendar' | 'gear'
+  | 'door' | 'calendar' | 'gear' | 'chat' | 'inbox'
 
 const paths: Record<IconName, React.ReactNode> = {
   tag: <><path d="M3 10V4h6l12 12-6 6L3 10Z" /><circle cx="7" cy="8" r="1" /></>,
@@ -17,6 +17,8 @@ const paths: Record<IconName, React.ReactNode> = {
   door: <><path d="M5 21V4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v17M3 21h18" /><circle cx="15" cy="12" r="1" /></>,
   calendar: <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></>,
   gear: <><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M4.9 4.9 7 7M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1" /></>,
+  chat: <path d="M4 5h16v11H9l-5 4V5Z" />,
+  inbox: <><path d="M3 13h5l1.5 3h5L16 13h5" /><path d="M5 5h14l2 8v6H3v-6l2-8Z" /></>,
   'eye-off': <><path d="m3 3 18 18M10 5c8-1 12 7 12 7s-1 3-4 5M6 6c-3 2-4 6-4 6s3 7 10 7c2 0 4-1 5-2" /><path d="M9 9a4 4 0 0 0 6 6" /></>,
 }
 

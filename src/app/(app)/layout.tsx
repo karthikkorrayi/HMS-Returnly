@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { requireSession } from '@/lib/auth'
+import { homeFor, requireSession } from '@/lib/auth'
 import { ROLE_LABEL } from '@/lib/types'
 import ReturnlyIcon from '@/components/ReturnlyIcon'
 import { signOut } from './actions'
@@ -12,7 +12,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="overview-shell min-h-screen md:grid md:grid-cols-[15rem_minmax(0,1fr)]">
       <aside className="hidden border-r border-line bg-surface p-5 md:sticky md:top-0 md:flex md:h-screen md:flex-col md:gap-7">
         <div>
-          <Link href="/items" className="flex items-center gap-3">
+          <Link href={homeFor(staff.role)} className="flex items-center gap-3">
             <span className="brand-mark"><ReturnlyIcon name="tag" /></span>
             <span className="text-xl font-bold tracking-tight">Returnly</span>
           </Link>

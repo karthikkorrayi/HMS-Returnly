@@ -6,7 +6,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import type { ActionState, StaffRole } from '@/lib/types'
 
-const ROLES: StaffRole[] = ['housekeeping', 'front_office', 'manager']
+const ROLES: StaffRole[] = ['housekeeping', 'front_office', 'manager', 'support']
 const MIN_PASSWORD = 10
 const str = (f: FormData, k: string) => String(f.get(k) ?? '').trim()
 

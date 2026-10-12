@@ -48,7 +48,7 @@ Room status is computed live from stays and checks, so there is nothing to keep 
 
 An in-house stay past its check-out date is treated as "may have left without checking out", not as "in the room". Items found in public areas are not traced. Results are computed when asked, so late or corrected stay data is picked up automatically.
 
-## Staff endpoints (built)
+## Staff endpoints for stays and room checks (built; screens removed, functions kept)
 
 | Role | Call | Does |
 |---|---|---|
@@ -68,19 +68,43 @@ Reads used by the app: `stays` (front office and managers, without the surname),
 
 ## Getting stays in
 
-1. **Now (manual):** check-in/out on the Stays page, or import a CSV (the PMS report, or a Google Sheet via File → Download → CSV). Supabase is the source of truth: a sheet is only ever an input, never edited back.
-2. **Optional automation of the sheet:** a Google Apps Script that posts new rows to an Edge Function, which calls `import_stays`. Same function, same validation.
-3. **Later (PMS):** a scheduled Edge Function pulls arrivals and departures from the PMS API and calls `import_stays` with `source = 'pms'`. No schema change is needed.
+The Stays page (check-in/out and CSV import) has been removed from the app. The database functions remain, so stays can still be loaded — and enquiry matching can use them — via:
 
-## Customer endpoints (designed, not built)
+1. **SQL / script:** call `import_stays(rows jsonb)` as a front office or manager user (same validation, duplicate-safe).
+2. **Later (PMS):** a scheduled Edge Function pulls arrivals and departures from the PMS API and calls `import_stays` with `source = 'pms'`. No schema change is needed.
 
-These use the same tables. Customers would sign in with an emailed one-time code (Supabase Auth) and get their own role. Row-level security limits them to their own cases, and they can never read `lost_items`, `stays` or `room_checks`.
+## Customer enquiries (built — migrations 0007–0008)
+
+Tables: `customer_requests`, `request_messages` (customer-visible conversation), `request_notes` (staff only), `request_events` (audit). Staff read them under row-level security: Admin (`manager`) sees all, `support` sees only requests assigned to them. All writes go through functions.
+
+**Public (no sign-in, `anon`)** — validated, rate-limited, and returning only the customer's own enquiry:
 
 | Call | Does |
 |---|---|
-| `verify_booking(inn_code, reservation_ref, surname)` | Edge Function, rate-limited, after the email code. Compares the surname inside the database (`_normalise_surname`) and returns the hotel and stay dates only, never the room |
-| `open_case(stay_id, description, category, colour, brand, …)` | Creates a case. Matching runs silently against open items in that stay's room and dates. The customer only learns "we may have something; staff will check", never item details |
-| `add_case_message(case_id, text)` / `add_case_evidence(case_id, file)` | Conversation and proof of ownership, private to the case |
-| `case_status(case_id)` | Status for the customer's case page |
+| `public_properties()` | Hotel names for the enquiry form |
+| `submit_customer_request(inn_code, name, booking_ref, item_name, description, category?, colour?, brand?, lost_location?, lost_date?)` | Creates the enquiry; returns a random reference `LF-XXXXX-XXXXX`. Max 5 per booking per day, 300 per hotel per hour |
+| `customer_request_status(reference, booking_ref)` | Status, item name as typed, and the conversation. No items, matches, notes or staff names |
+| `customer_reply(reference, booking_ref, body)` | Adds a customer message; moves "Awaiting customer information" back to investigation. Max 20 a day |
 
-Matching runs both ways. A new item checks open cases, and a new case checks open items. Either one creates a suggestion for staff, who confirm through the existing candidate → handover flow.
+**Staff**
+
+| Role | Call | Does |
+|---|---|---|
+| Admin | `assign_request(id, staff_id \| null)` | Assign to an active Support or Admin member |
+| Admin, assigned Support | `set_request_status(id, status, note?)` | Support: → under investigation, → awaiting admin. Admin: everything except approve (below); reject needs a reason; resolve only after approve/reject |
+| Admin | `approve_request(id, item_id, note?)` | Explicit decision tied to one item; adds the booking as a possible owner on the item. Does **not** release the item |
+| Admin, assigned Support | `message_customer(id, body, ask?)` | Message shown to the customer; `ask = true` → Awaiting customer information |
+| Admin, assigned Support | `add_request_note(id, body)` | Internal note |
+| Admin, assigned Support | `match_request_items(id)` | Ranked open items: type +30, brand +20, colour +15, shared words +5 each (max 25), found in the booking's room during/after its stay +25 (uses `stays`), within 3 days of the date given +10. Strong ≥ 60, partial 35–59, weak 15–34; shown capped at 100. A guide, never proof |
+| Admin | `update_request_settings(retention_days)` | Retention for closed enquiries |
+| Scheduled job | `purge_closed_requests()` | Deletes rejected/resolved enquiries past retention |
+
+Support staff can read items but a trigger blocks them from creating or changing items, photos, possible owners, stays or room checks.
+
+## AI assistant integration (later)
+
+The customer chat runs on `EnquiryAssistant` (`src/lib/requests/assistant.ts`); today that's `ruleBasedAssistant` plus keyword extraction (`extract.ts`). An AI version must:
+
+- implement the same `start` / `respond` interface and end in the same reviewed `EnquiryPayload` (`src/lib/requests/types.ts`), which the customer confirms before anything is sent;
+- run on the server (API keys never in the browser) and only ever receive what the customer typed — never item records, matches or other customers' data, so a prompt-injected model has nothing to leak;
+- ask clarifying questions when fields are missing, but never say an item has been found, decide ownership, or approve anything — matching and decisions stay in `match_request_items` and with staff.

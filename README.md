@@ -1,12 +1,13 @@
 # HMS Returnly — hotel lost & found
 
-Housekeeping logs items left behind in rooms and public areas, with photos. The front desk matches each item to a reservation, records how it went back to the guest, and managers approve disposal of unclaimed items after the retention period. Every step is written to a custody log that can't be edited or deleted.
+Housekeeping logs items left behind in rooms and public areas, with photos. Customers send lost property enquiries from the public home page; Support staff investigate them and an Admin approves or rejects each claim. The front desk records how items go back to guests, and managers approve disposal of unclaimed items after the retention period. Every step is written to an audit log that can't be edited or deleted.
 
 Built with Next.js 16 (App Router) and Supabase (Postgres, Auth, Storage), in a Supabase project of its own.
 
 ## Data rules
 
-- **No guest names, emails or phone numbers are stored.** Guests are referenced only by the PMS reservation/confirmation number. Contacting guests happens in the PMS.
+- **Items reference guests only by reservation number.** Customer enquiries hold the name and booking ID the customer typed (not verified), and are deleted a set time after they close (Settings). No emails or phone numbers are collected.
+- **Customers never see hotel records.** The public pages return only their own enquiry's status and messages, after matching reference + booking ID. Matches, item details, internal notes and staff names are staff-only.
 - **Sensitive items** (passports, ID, bank cards, medication) cannot be photographed, and must be stored in a secure location.
 - **Valuable and sensitive items** need a second staff member as witness at handover. Disposal and donation always need a witness and a manager.
 - Photos are resized and stripped of EXIF metadata (including GPS) on the device before upload. They live in a private bucket and are shown through 30-minute signed links.
@@ -14,13 +15,21 @@ Built with Next.js 16 (App Router) and Supabase (Postgres, Auth, Storage), in a 
 
 ## Roles
 
-| | Housekeeping | Front office | Manager |
-|---|:-:|:-:|:-:|
-| Log items, add photos, store and move items | ✓ | ✓ | ✓ |
-| Add and confirm possible owners (reservation numbers) | | ✓ | ✓ |
-| Record contact, collection, posting and handover | | ✓ | ✓ |
-| Dispose or donate after retention | | | ✓ |
-| Delete photos, add and deactivate staff, reset passwords | | | ✓ |
+"Admin" in the app is the **manager** role.
+
+| | Housekeeping | Front office | Support | Manager (Admin) |
+|---|:-:|:-:|:-:|:-:|
+| Log items, add photos, store and move items | ✓ | ✓ | | ✓ |
+| Add and confirm possible owners (reservation numbers) | | ✓ | | ✓ |
+| Record contact, collection, posting and handover | | ✓ | | ✓ |
+| Read items (to investigate enquiries) | ✓ | ✓ | ✓ | ✓ |
+| Customer enquiries: see | | | assigned to them | all |
+| Enquiries: notes, ask the customer, mark ready for admin | | | ✓ | ✓ |
+| Enquiries: assign, approve, reject, resolve | | | | ✓ |
+| Dispose or donate after retention | | | | ✓ |
+| Delete photos, add and deactivate staff, settings | | | | ✓ |
+
+These rules are enforced in the database (row-level security, triggers and workflow functions) as well as in the pages; hiding a link is never the protection.
 
 ## Item lifecycle
 
@@ -30,15 +39,20 @@ logged → stored → matched → guest_contacted → awaiting_collection → re
 stored / matched / guest_contacted → disposed | donated   (manager, after retention date, with witness)
 ```
 
-## Stay log and room checks
+## Customer enquiries
 
-Until the PMS can be connected, front desk keeps a stay log in Returnly and housekeeping records a check of every room after departure. Any item found in a room can then be traced to the stays most likely to own it. API details: [docs/backend-api.md](docs/backend-api.md).
+1. **Customer** (home page, no sign-in): gives their name and booking ID, describes the item in a guided chat, reviews the details and sends. They get a reference like `LF-3FA9C-81D2E`. On **Check an enquiry** (`/track`), reference + booking ID show the status and messages, and let them answer staff questions.
+2. **Admin** (`/requests`): sees every enquiry with counts by status, search and filters; opens one to see the report, conversation, **possible matches** (strong / partial / weak, with reasons), internal notes and history; assigns it to Support.
+3. **Support** (`/support`): works on the enquiries assigned to them — investigates matches, adds internal notes, asks the customer questions, and marks it **ready for admin review**.
+4. **Admin decides.** Approving is always a person choosing a specific item; it adds the booking as a possible owner on that item. The item is only released through its own ID check and handover. Reject needs a reason. Resolve closes the enquiry.
 
-- **Rooms** (everyone): each room is *Occupied*, *Due out*, *Needs check*, *Check overdue* or *Ready*. After a departure, housekeeping opens the room and taps **Clean – no items found** or **Items found – log them** (which opens the item form linked to that check). No guest details are shown to housekeeping.
-- **Stays** (front office, managers): check guests in and out, or import the PMS arrivals/in-house/departures report or a Google Sheet saved as CSV ([template](public/stays-import-template.csv)). Re-importing the same file is safe; corrections are logged. Guest surnames are stored only so a guest can later prove a booking; nobody can read them through the app or the API.
-- **Likely owners** (front office, managers, on each item found in a room): stays in that room within the trace window, ranked with reasons. Each clean check since a guest left lowers their score, less so if the item was somewhere hard to see. **Add as possible owner** feeds the existing confirm → contact → handover flow. Staff decide; the score never does.
-- **Settings** (managers): trace window, room check deadline, how long to keep stays and unclaimed items.
-- **Retention:** `purge_expired_stays()` deletes stays older than the stay retention period. Schedule it daily (Setup, step 7).
+Statuses: Pending review → Under investigation ⇄ Awaiting customer information → Awaiting admin confirmation → Approved / Rejected → Resolved.
+
+The chat is a **rule-based guided form** (`src/lib/requests/assistant.ts`), labelled as such to customers. It's built so an AI assistant can replace it later without changing the pages — see [docs/backend-api.md](docs/backend-api.md).
+
+### Rooms and Stays
+
+The Rooms and Stays screens have been removed. Their tables (`stays`, `room_checks`, `stay_changes`) and data are kept; existing stays are still used by enquiry matching ("found in the room where this booking stayed").
 
 ## Setup
 
@@ -46,6 +60,7 @@ Until the PMS can be connected, front desk keeps a stay log in Returnly and hous
 2. **Apply the database.** Either:
    - with the [Supabase CLI](https://supabase.com/docs/guides/cli): `supabase link --project-ref <ref>`, then `supabase db push`, then run `supabase/seed.sql` for demo data; or
    - paste each file in `supabase/migrations/` into the SQL editor in filename order, then `supabase/seed.sql`.
+   Run `…000007_support_role.sql` on its own, before `…000008`: Postgres can't use a new role value in the same run that adds it.
 3. **Turn off public sign-ups** in the project's Authentication settings ("Allow new users to sign up"). Staff accounts are created by managers only.
 4. **Configure the app:** `cp .env.example .env.local`, then fill in the URL and keys from Project Settings → API.
 5. **Create the first manager:**
@@ -54,10 +69,12 @@ Until the PMS can be connected, front desk keeps a stay log in Returnly and hous
    npm run create-staff -- --property DEMO --username demo.manager --name "Demo Manager" --role manager
    ```
 6. **Run it:** `npm run dev` for the laptop. To try it on a phone on the same Wi-Fi, set `DEV_LAN_HOST` in `.env.local` to your computer's LAN IP, run `npm run dev:lan`, and open `http://<that-ip>:3000` on the phone. For a production-like test, `npm run build` then `npm run start:lan`.
-7. **Schedule the stay clean-up** (once): Database → Extensions → enable `pg_cron`, then in the SQL editor run
+7. **Schedule the clean-ups** (once): Database → Extensions → enable `pg_cron`, then in the SQL editor run
    ```sql
    select cron.schedule('purge-expired-stays', '30 3 * * *', $$select public.purge_expired_stays()$$);
+   select cron.schedule('purge-closed-requests', '40 3 * * *', $$select public.purge_closed_requests()$$);
    ```
+8. **Create Support staff** on the Staff page (role: Support), then assign enquiries to them from Customer requests.
 
 ### Real hotel data
 
@@ -79,8 +96,9 @@ The same checks run in GitHub Actions on every push and pull request.
 
 ## Not built yet
 
-- Customer-facing lost property assistant (chat, booking check by confirmation number + surname, case tracking) — endpoints designed in [docs/backend-api.md](docs/backend-api.md)
-- Automatic PMS sync (the stay import is the manual bridge; `stays.source = 'pms'` is reserved for it)
+- AI chat assistant (the rule-based guided form is in place; see docs/backend-api.md for the integration contract)
+- Email notifications to customers when staff reply (customers check `/track` for now)
+- Automatic PMS sync for bookings
 - Screens for managers to edit rooms and storage locations (use the SQL editor for now)
 - Editing an item's description after logging
 - Removing photos from storage automatically once an item is closed

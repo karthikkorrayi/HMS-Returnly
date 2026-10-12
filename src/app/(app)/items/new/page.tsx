@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { requireSession } from '@/lib/auth'
+import { ITEM_ROLES, requireSession } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import type { RoomCheck } from '@/lib/types'
 import LogItemForm from './LogItemForm'
@@ -9,7 +9,7 @@ export default async function NewItemPage({
 }: {
   searchParams: Promise<{ room?: string; check?: string }>
 }) {
-  const { staff, property } = await requireSession()
+  const { staff, property } = await requireSession(ITEM_ROLES)
   const params = await searchParams
   const supabase = await createClient()
 

@@ -1,7 +1,8 @@
 // Shared types and labels. Values mirror the enums and checks in
 // supabase/migrations — change both together.
 
-export type StaffRole = 'housekeeping' | 'front_office' | 'manager'
+// manager = Admin in the UI. support = Support department (customer enquiries).
+export type StaffRole = 'housekeeping' | 'front_office' | 'manager' | 'support'
 export type ValueTier = 'standard' | 'valuable' | 'sensitive'
 export type ItemStatus =
   | 'logged'
@@ -32,6 +33,7 @@ export type Property = {
   trace_window_days: number
   stay_retention_days: number
   check_due_hours: number
+  request_retention_days: number
 }
 
 export type StorageLocation = {
@@ -166,6 +168,7 @@ export const ROLE_LABEL: Record<StaffRole, string> = {
   housekeeping: 'Housekeeping',
   front_office: 'Front office',
   manager: 'Manager',
+  support: 'Support',
 }
 
 export const STATUS_LABEL: Record<ItemStatus, string> = {

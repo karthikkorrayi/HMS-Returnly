@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { requireSession } from '@/lib/auth'
+import { ITEM_ROLES, requireSession } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { signPhotoUrls } from '@/lib/photo-urls'
 import { hotelToday } from '@/lib/format'
@@ -27,7 +27,7 @@ export default async function ItemsPage({
 }: {
   searchParams: Promise<{ view?: string; q?: string; p?: string }>
 }) {
-  const { staff, property } = await requireSession()
+  const { staff, property } = await requireSession(ITEM_ROLES)
   const params = await searchParams
 
   // Preserve links from the old item board.

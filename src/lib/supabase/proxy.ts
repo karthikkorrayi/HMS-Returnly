@@ -2,13 +2,14 @@ import { signInDestination } from '@/lib/sign-in-destination'
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-const PUBLIC_PATHS = ['/login']
+// Public pages: customer enquiry status and staff sign-in.
+const PUBLIC_PATHS = ['/login', '/track']
 
 // Refreshes the Supabase session cookie on every request and sends signed-out
 // visitors to /login. This is an optimistic check only — pages and server
 // actions verify the staff member again before doing anything.
 export async function updateSession(request: NextRequest) {
-  // Public preview uses bundled sample data, not hotel records.
+  // Public customer home page: no hotel records are read with the session here.
   if (request.nextUrl.pathname === '/') return NextResponse.next()
   let response = NextResponse.next({ request })
 

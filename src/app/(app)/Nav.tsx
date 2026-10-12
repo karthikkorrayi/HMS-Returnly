@@ -8,10 +8,7 @@ import type { StaffRole } from '@/lib/types'
 type NavItem = {
   href: string
   label: string
-  icon: 'grid' | 'plus' | 'people' | 'door' | 'calendar' | 'gear'
-  // Shown in the phone bottom bar (max 5); the rest are desktop-rail only
-  // and reachable from other pages on phones.
-  bar: boolean
+  icon: 'grid' | 'plus' | 'people' | 'gear' | 'chat' | 'inbox'
 }
 
 function Icon({ name }: { name: NavItem['icon'] }) {
@@ -30,6 +27,29 @@ function Icon({ name }: { name: NavItem['icon'] }) {
   )
 }
 
+// Navigation per role. This only decides what is shown; every page and the
+// database check the role again, so a hidden link is never the protection.
+const NAV: Record<StaffRole, NavItem[]> = {
+  manager: [
+    { href: '/items', label: 'Dashboard', icon: 'grid' },
+    { href: '/items/new', label: 'Log item', icon: 'plus' },
+    { href: '/requests', label: 'Requests', icon: 'chat' },
+    { href: '/staff', label: 'Staff', icon: 'people' },
+    { href: '/settings', label: 'Settings', icon: 'gear' },
+  ],
+  front_office: [
+    { href: '/items', label: 'Dashboard', icon: 'grid' },
+    { href: '/items/new', label: 'Log item', icon: 'plus' },
+  ],
+  housekeeping: [
+    { href: '/items', label: 'Dashboard', icon: 'grid' },
+    { href: '/items/new', label: 'Log item', icon: 'plus' },
+  ],
+  support: [
+    { href: '/support', label: 'Support requests', icon: 'inbox' },
+  ],
+}
+
 export default function Nav({
   role,
   variant,
@@ -38,24 +58,15 @@ export default function Nav({
   variant: 'rail' | 'bar'
 }) {
   const pathname = usePathname()
-  const desk = role === 'front_office' || role === 'manager'
-  const manager = role === 'manager'
-
-  const all: NavItem[] = [
-    { href: '/items', label: 'Dashboard', icon: 'grid', bar: true },
-    { href: '/rooms', label: 'Rooms', icon: 'door', bar: true },
-    { href: '/items/new', label: 'Log item', icon: 'plus', bar: true },
-    ...(desk ? [{ href: '/stays', label: 'Stays', icon: 'calendar' as const, bar: true }] : []),
-    ...(manager ? [{ href: '/staff', label: 'Staff', icon: 'people' as const, bar: true }] : []),
-    ...(manager ? [{ href: '/settings', label: 'Settings', icon: 'gear' as const, bar: false }] : []),
-  ]
-  const items = variant === 'bar' ? all.filter((i) => i.bar) : all
+  const items = NAV[role] ?? []
 
   function isActive(href: string) {
-    return href === '/items'
-      ? pathname === '/items' ||
-        (pathname.startsWith('/items/') && pathname !== '/items/new')
-      : pathname === href || pathname.startsWith(`${href}/`)
+    if (href === '/items') {
+      return pathname === '/items' || (pathname.startsWith('/items/') && pathname !== '/items/new')
+    }
+    // A request opened from Support requests keeps that tab highlighted.
+    if (href === '/support') return pathname === '/support' || (role === 'support' && pathname.startsWith('/requests/'))
+    return pathname === href || pathname.startsWith(`${href}/`)
   }
 
   return (
