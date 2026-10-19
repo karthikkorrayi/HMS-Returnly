@@ -1,0 +1,12 @@
+-- [Railway copy] Intentionally empty.
+--
+-- The original (supabase/migrations/20260929000004_photo_storage.sql) only
+-- configured Supabase Storage: the private item-photos bucket (5 MB, JPEG/WebP)
+-- and three policies on storage.objects (read: own hotel only; upload: own
+-- hotel, item not sensitive and not returned/disposed/donated; delete: manager
+-- only). Plain Postgres has no storage schema. On Railway the bucket is an S3
+-- bucket and these rules move to the app plus a SQL helper in Phase 5, tested
+-- against the same cases as supabase/tests/rls.test.mjs.
+--
+-- Kept (not deleted) so migration numbering and history match Supabase.
+-- tests/migrations-sync.test.mjs fails if this file gains any SQL.

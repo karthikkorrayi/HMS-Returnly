@@ -6,6 +6,10 @@ instead of Supabase. Supabase production is unchanged until launch.
 | Path | What | Run as | When |
 |---|---|---|---|
 | `bootstrap/000_platform.sql` | Roles `anon`, `authenticated`, `app_user`, `app_owner`; `auth.users`; `auth.uid()`; Supabase's default grants | a superuser | once per new database (safe to repeat) |
+| `migrations/*.sql` | The eight Supabase migrations, copied. `004` is empty and `008` lacks one block: both only configured Supabase Storage, whose photo rules move to the app in Phase 5 | `app_owner` | in filename order, after the bootstrap; `007` alone in its own transaction |
+
+While `supabase/migrations/` still exists (until launch), change both folders together:
+`tests/migrations-sync.test.mjs` fails if the copies drift from the originals.
 
 ## Roles
 

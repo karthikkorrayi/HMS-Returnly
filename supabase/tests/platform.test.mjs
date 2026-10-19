@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unused-expressions -- `cond ? pass() : fail()` checks */
 // Run with: npm run test:db
 // Platform bootstrap for plain Postgres (db/bootstrap/000_platform.sql):
-// applies it, then all migrations as the non-superuser owner app_owner, and
-// checks the roles the Railway app will use.
+// applies it, then the Railway migrations (db/migrations) as the non-superuser
+// owner app_owner, on bare Postgres with no Supabase storage schema, and checks
+// the roles the Railway app will use.
 //   Part A (PGlite and real Postgres): ownership, role attributes, grants, RLS.
 //   Part B (real Postgres only): logs in as app_user, like the web app, and
 //   proves it can do nothing without SET LOCAL ROLE and that nothing leaks
@@ -24,33 +25,20 @@ const bootstrap = readFileSync(`${ROOT}/db/bootstrap/000_platform.sql`, 'utf8')
 await db.exec(bootstrap)
 try { await db.exec(bootstrap); pass('bootstrap can be run twice') } catch (e) { fail('bootstrap re-run → ' + e.message) }
 
-// Test-only stand-in for Supabase Storage, owned by app_owner, so migrations 04
-// and 08 still apply. Photos move to an S3 bucket in Phase 5.
-await db.exec(`
-  create schema storage authorization app_owner;
-  grant usage on schema storage to authenticated;
-  set role app_owner;
-  create table storage.buckets (id text primary key, name text, public boolean,
-    file_size_limit bigint, allowed_mime_types text[]);
-  create table storage.objects (id uuid primary key default gen_random_uuid(),
-    bucket_id text, name text);
-  alter table storage.objects enable row level security;
-  grant all on storage.objects to authenticated;
-  create function storage.foldername(name text) returns text[] language sql immutable as
-    $$ select (string_to_array(name, '/'))[1:array_length(string_to_array(name, '/'), 1) - 1] $$;
-  reset role;
-`)
-
-// --- Migrations, applied as app_owner -------------------------------------------
-for (const f of readdirSync(`${REPO}/migrations`).sort()) {
+// --- Railway migrations, applied as app_owner ------------------------------------
+const MIGRATIONS = `${ROOT}/db/migrations`
+const failuresBefore = failures
+for (const f of readdirSync(MIGRATIONS).sort()) {
   try {
-    await db.exec(`set role app_owner;\n${readFileSync(`${REPO}/migrations/${f}`, 'utf8')}\n;reset role;`)
+    await db.exec(`set role app_owner;\n${readFileSync(`${MIGRATIONS}/${f}`, 'utf8')}\n;reset role;`)
   } catch (e) {
     await db.exec('reset role').catch(() => {})
     fail(`${f} as app_owner → ${e.message}`)
   }
 }
-pass('all migrations apply as app_owner (not a superuser)')
+if (failures === failuresBefore) pass('all db/migrations apply as app_owner (not a superuser)')
+const storageSchema = await one(`select count(*)::int n from pg_namespace where nspname = 'storage'`)
+storageSchema.n === 0 ? pass('no Supabase storage schema needed or created') : fail('a storage schema exists')
 await db.exec(`set role app_owner;\n${readFileSync(`${REPO}/seed.sql`, 'utf8')}\n;reset role;`)
 
 console.log('\nPart A: ownership, roles, grants')
