@@ -25,6 +25,16 @@ edited or removed, if a new file sorts before one already applied, or if another
 Files with statement-level `DROP`, `TRUNCATE`, `DELETE` or `RENAME` also need `--allow-destructive`.
 A file that fails is rolled back and not recorded. Applied files are never edited: fix forward with a new file.
 
+## App code: src/lib/db
+
+All queries go through `withStaff(userId, tx => …)` or `withAnon(tx => …)` from `@/lib/db`. Each call runs in one
+transaction as `authenticated` (with the staff user id) or `anon`, so row-level security applies exactly as on Supabase.
+
+- `tx.query(sql, params)` for parameterised SQL; `tx.rpc(fn, { p_name: value })` for workflow functions.
+- Statements starting with `SET`/`RESET`, `set_config()`, and transaction control are refused before reaching the database.
+- On start-up the pool checks it is logged in as `app_user` (not a superuser) and refuses to serve requests otherwise.
+- `tests/db-guard.test.mjs` fails if any file outside `src/lib/db` switches roles or imports `pg`.
+
 ## Roles
 
 | Role | Logs in | Used by | Can do |

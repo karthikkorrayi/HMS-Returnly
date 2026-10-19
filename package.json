@@ -9,7 +9,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --import ./tests/resolve-ts.mjs --test tests/*.test.mjs",
-    "test:db": "node supabase/tests/rls.test.mjs && node supabase/tests/stays.test.mjs && node supabase/tests/trace-refinements.test.mjs && node supabase/tests/customer-requests.test.mjs && node supabase/tests/platform.test.mjs && node supabase/tests/migrate.test.mjs",
+    "test:db": "node supabase/tests/rls.test.mjs && node supabase/tests/stays.test.mjs && node supabase/tests/trace-refinements.test.mjs && node supabase/tests/customer-requests.test.mjs && node supabase/tests/platform.test.mjs && node supabase/tests/migrate.test.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON supabase/tests/data-layer.test.mjs",
     "db:migrate": "node db/migrate.mjs",
     "create-staff": "node --env-file=.env.local scripts/create-staff.mjs",
     "dev:lan": "next dev -H 0.0.0.0",
@@ -20,6 +20,7 @@
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.117.2",
     "next": "16.4.2",
+    "pg": "8.23.1",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "server-only": "^0.0.1"
@@ -28,11 +29,11 @@
     "@electric-sql/pglite": "^0.5.8",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/pg": "8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.2",
-    "pg": "8.23.1",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
