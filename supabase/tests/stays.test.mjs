@@ -3,17 +3,21 @@
 // Stay log, room checks, room board and ownership tracing
 // (migration 20261006000005). Applies every migration in PGlite with
 // Supabase auth/storage stubbed, then exercises the rules per role.
-import { PGlite } from '@electric-sql/pglite'
+import { openTestDb } from './test-db.mjs'
 import { readFileSync, readdirSync } from 'node:fs'
 
 const REPO = new URL('..', import.meta.url).pathname.replace(/\/$/, '')
-const db = new PGlite()
+const { db, kind, close } = await openTestDb('stays')
+console.log('database: ' + kind)
 let failures = 0
 const pass = (m) => console.log('  ok   ' + m)
 const fail = (m) => { failures++; console.log('  FAIL ' + m) }
 
 await db.exec(`
-  create role anon nologin; create role authenticated nologin;
+  do $$ begin
+    if not exists (select from pg_roles where rolname = 'anon') then create role anon nologin; end if;
+    if not exists (select from pg_roles where rolname = 'authenticated') then create role authenticated nologin; end if;
+  end $$;
   alter default privileges in schema public grant all on tables to anon, authenticated;
   alter default privileges in schema public grant all on sequences to anon, authenticated;
   grant usage on schema public to anon, authenticated;
@@ -222,4 +226,5 @@ purged >= 1 && after.stay_id === null && after.reservation_ref === 'STAYC'
 await err('staff cannot run the purge', U.mgr, `select public.purge_expired_stays()`, [], 'permission denied')
 
 console.log(failures ? `\n${failures} FAILED` : '\nall checks passed')
+await close()
 process.exit(failures ? 1 : 0)

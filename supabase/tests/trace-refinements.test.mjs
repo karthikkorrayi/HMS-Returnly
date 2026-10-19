@@ -2,17 +2,21 @@
 // Run with: npm run test:db
 // Refinements in migration 20261007000006: stay history, overdue room checks,
 // guests who leave without checking out, hidden spots, manager settings.
-import { PGlite } from '@electric-sql/pglite'
+import { openTestDb } from './test-db.mjs'
 import { readFileSync, readdirSync } from 'node:fs'
 
 const REPO = new URL('..', import.meta.url).pathname.replace(/\/$/, '')
-const db = new PGlite()
+const { db, kind, close } = await openTestDb('trace_refinements')
+console.log('database: ' + kind)
 let failures = 0
 const pass = (m) => console.log('  ok   ' + m)
 const fail = (m) => { failures++; console.log('  FAIL ' + m) }
 
 await db.exec(`
-  create role anon nologin; create role authenticated nologin;
+  do $$ begin
+    if not exists (select from pg_roles where rolname = 'anon') then create role anon nologin; end if;
+    if not exists (select from pg_roles where rolname = 'authenticated') then create role authenticated nologin; end if;
+  end $$;
   alter default privileges in schema public grant all on tables to anon, authenticated;
   alter default privileges in schema public grant all on sequences to anon, authenticated;
   grant usage on schema public to anon, authenticated;
@@ -151,4 +155,5 @@ await err('retention must cover the trace window', U.mgr, `select public.update_
 await err('out-of-range values rejected', U.mgr, `select public.update_property_settings(30, 120, 99, 60)`, [], 'check_due_hours')
 
 console.log(failures ? `\n${failures} FAILED` : '\nall checks passed')
+await close()
 process.exit(failures ? 1 : 0)

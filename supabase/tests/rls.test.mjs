@@ -2,18 +2,22 @@
 // Run with: npm run test:db
 // Runs the HMS Returnly migrations in PGlite with Supabase auth/storage stubbed,
 // then exercises the role and workflow rules. Exit code 1 on any failed check.
-import { PGlite } from '@electric-sql/pglite'
+import { openTestDb } from './test-db.mjs'
 import { readFileSync, readdirSync } from 'node:fs'
 
 const REPO = new URL('..', import.meta.url).pathname.replace(/\/$/, '')
-const db = new PGlite()
+const { db, kind, close } = await openTestDb('rls')
+console.log('database: ' + kind)
 let failures = 0
 const pass = (m) => console.log('  ok   ' + m)
 const fail = (m) => { failures++; console.log('  FAIL ' + m) }
 
 // --- Supabase platform stubs -------------------------------------------------
 await db.exec(`
-  create role anon nologin; create role authenticated nologin;
+  do $$ begin
+    if not exists (select from pg_roles where rolname = 'anon') then create role anon nologin; end if;
+    if not exists (select from pg_roles where rolname = 'authenticated') then create role authenticated nologin; end if;
+  end $$;
   alter default privileges in schema public grant all on tables to anon, authenticated;
   alter default privileges in schema public grant all on sequences to anon, authenticated;
   grant usage on schema public to anon, authenticated;
@@ -222,4 +226,5 @@ console.log('  ' + trail.rows.map((r) => r.to_status).join(' → '))
 trail.rows.length === 7 ? pass('full custody trail for returned item') : fail(`expected 7 events, got ${trail.rows.length}`)
 
 console.log(failures ? `\n${failures} FAILED` : '\nall checks passed')
+await close()
 process.exit(failures ? 1 : 0)
