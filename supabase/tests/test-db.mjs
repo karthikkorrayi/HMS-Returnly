@@ -85,7 +85,7 @@ export async function openTestDb(suite) {
     const c = new pg.Client({ connectionString: u.toString() })
     await c.connect()
     extra.push(c)
-    return { query: wrap(c), end: () => c.end() }
+    return { query: wrap(c), exec: (sql) => c.query(sql), end: () => c.end() }
   }
 
   const close = async () => {
