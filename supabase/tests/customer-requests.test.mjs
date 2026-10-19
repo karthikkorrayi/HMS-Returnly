@@ -2,17 +2,21 @@
 // Run with: npm run test:db
 // Customer enquiries and the Support role (migrations 0007–0008): public
 // submit/status/reply, privacy, matching, and what each role may do.
-import { PGlite } from '@electric-sql/pglite'
+import { openTestDb } from './test-db.mjs'
 import { readFileSync, readdirSync } from 'node:fs'
 
 const REPO = new URL('..', import.meta.url).pathname.replace(/\/$/, '')
-const db = new PGlite()
+const { db, kind, close } = await openTestDb('customer_requests')
+console.log('database: ' + kind)
 let failures = 0
 const pass = (m) => console.log('  ok   ' + m)
 const fail = (m) => { failures++; console.log('  FAIL ' + m) }
 
 await db.exec(`
-  create role anon nologin; create role authenticated nologin;
+  do $$ begin
+    if not exists (select from pg_roles where rolname = 'anon') then create role anon nologin; end if;
+    if not exists (select from pg_roles where rolname = 'authenticated') then create role authenticated nologin; end if;
+  end $$;
   alter default privileges in schema public grant all on tables to anon, authenticated;
   alter default privileges in schema public grant all on sequences to anon, authenticated;
   grant usage on schema public to anon, authenticated;
@@ -209,4 +213,5 @@ purged === 1 ? pass('closed enquiries past retention are deleted') : fail('purge
 await err('staff cannot run the purge', U.mgr, `select public.purge_closed_requests()`, [], 'permission denied')
 
 console.log(failures ? `\n${failures} FAILED` : '\nall checks passed')
+await close()
 process.exit(failures ? 1 : 0)

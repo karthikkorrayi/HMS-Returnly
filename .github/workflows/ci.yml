@@ -12,6 +12,20 @@ jobs:
       # Placeholders so the build can compile; no real project is contacted.
       NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
       NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
+    services:
+      # Throwaway Postgres 17 that exists only for this CI run. Trust auth on a
+      # private CI network means no password to manage.
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -23,6 +37,10 @@ jobs:
       - run: npm run typecheck
       - name: Unit tests
         run: npm test
-      - name: Database rules (migrations + RLS + workflow)
+      - name: Database rules on PGlite (migrations + RLS + workflow)
+        run: npm run test:db
+      - name: Database rules on real Postgres 17
+        env:
+          TEST_DATABASE_URL: postgresql://postgres@localhost:5432/postgres
         run: npm run test:db
       - run: npm run build

@@ -89,6 +89,8 @@ npm run lint
 npm run typecheck
 npm test          # unit tests in tests/
 npm run test:db   # applies migrations in an in-memory Postgres and tests every role and workflow rule
+# Same tests on a real local Postgres 17 (CI does this too). Each suite makes and drops its own database:
+TEST_DATABASE_URL=postgresql://postgres@localhost:5432/postgres npm run test:db
 npm run build
 ```
 
