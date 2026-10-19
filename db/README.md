@@ -7,9 +7,23 @@ instead of Supabase. Supabase production is unchanged until launch.
 |---|---|---|---|
 | `bootstrap/000_platform.sql` | Roles `anon`, `authenticated`, `app_user`, `app_owner`; `auth.users`; `auth.uid()`; Supabase's default grants | a superuser | once per new database (safe to repeat) |
 | `migrations/*.sql` | The eight Supabase migrations, copied. `004` is empty and `008` lacks one block: both only configured Supabase Storage, whose photo rules move to the app in Phase 5 | `app_owner` | in filename order, after the bootstrap; `007` alone in its own transaction |
+| `migrate.mjs` | The runner: applies `migrations/` in order, one transaction per file, recording each file's SHA-256 in `ops.schema_migrations` | `app_owner` via `MIGRATION_DATABASE_URL` | every deploy (Phase 7 pre-deploy step) |
 
 While `supabase/migrations/` still exists (until launch), change both folders together:
 `tests/migrations-sync.test.mjs` fails if the copies drift from the originals.
+
+## Running migrations
+
+```bash
+MIGRATION_DATABASE_URL=… npm run db:migrate               # plan only: lists pending files, changes nothing
+MIGRATION_DATABASE_URL=… npm run db:migrate -- --apply    # apply them
+```
+
+The runner stops **before changing anything** if it is connected as anything other than `app_owner`
+(a superuser would end up owning the tables), if the bootstrap has not been run, if an applied file was
+edited or removed, if a new file sorts before one already applied, or if another run holds the lock.
+Files with statement-level `DROP`, `TRUNCATE`, `DELETE` or `RENAME` also need `--allow-destructive`.
+A file that fails is rolled back and not recorded. Applied files are never edited: fix forward with a new file.
 
 ## Roles
 
