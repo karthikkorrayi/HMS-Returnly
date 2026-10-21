@@ -1,9 +1,39 @@
 'use client'
 
 import { useActionState, useState } from 'react'
-import { signIn } from './actions'
-import { initialActionState } from '@/lib/types'
+import { finishSignIn } from './actions'
+import { initialActionState, type ActionState } from '@/lib/types'
+import { USERNAME_PATTERN } from '@/lib/better-auth/rules'
 import ReturnlyIcon from '@/components/ReturnlyIcon'
+
+// Signing in is two steps:
+//   1. the browser sends the username and password to Better Auth, which
+//      checks them, applies the sign-in rate limit and sets the session cookie;
+//   2. the server action finishSignIn checks the login belongs to an active
+//      staff member, then opens their page.
+async function signIn(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const username = String(formData.get('username') ?? '').trim().toLowerCase()
+  const password = String(formData.get('password') ?? '')
+  if (!USERNAME_PATTERN.test(username) || !password) {
+    return { error: 'Enter your username and password.' }
+  }
+
+  let res: Response
+  try {
+    res = await fetch('/api/auth/sign-in/username', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ username, password }),
+    })
+  } catch {
+    return { error: 'Could not reach the server. Check your connection and try again.' }
+  }
+  if (res.status === 429) return { error: 'Too many attempts. Wait a minute, then try again.' }
+  if (!res.ok) return { error: 'Username or password is incorrect.' }
+
+  return finishSignIn(formData.get('next'))
+}
 
 export default function LoginForm({ next = '/items' }: { next?: string }) {
   const [state, formAction, pending] = useActionState(signIn, initialActionState)

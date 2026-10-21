@@ -9,9 +9,10 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --import ./tests/resolve-ts.mjs --test tests/*.test.mjs",
-    "test:db": "node supabase/tests/rls.test.mjs && node supabase/tests/stays.test.mjs && node supabase/tests/trace-refinements.test.mjs && node supabase/tests/customer-requests.test.mjs && node supabase/tests/platform.test.mjs && node supabase/tests/migrate.test.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON supabase/tests/data-layer.test.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./tests/resolve-ts.mjs supabase/tests/auth.test.mjs",
+    "test:db": "node supabase/tests/rls.test.mjs && node supabase/tests/stays.test.mjs && node supabase/tests/trace-refinements.test.mjs && node supabase/tests/customer-requests.test.mjs && node supabase/tests/platform.test.mjs && node supabase/tests/migrate.test.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON supabase/tests/data-layer.test.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./tests/resolve-ts.mjs supabase/tests/auth.test.mjs && node supabase/tests/local-db.test.mjs",
     "db:migrate": "node db/migrate.mjs",
-    "create-staff": "node --env-file=.env.local scripts/create-staff.mjs",
+    "create-staff": "node --env-file=.env.local --experimental-strip-types --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./tests/resolve-ts.mjs scripts/create-staff.mjs",
+    "db:local:setup": "node scripts/local-db-setup.mjs",
     "dev:lan": "next dev -H 0.0.0.0",
     "start:lan": "next start -H 0.0.0.0"
   },

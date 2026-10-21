@@ -1,49 +1,53 @@
 import 'server-only'
 import { cache } from 'react'
+import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
-import type { Property, Staff, StaffRole } from '@/lib/types'
+import { getAuth } from '@/lib/better-auth/instance'
+import { withStaff } from '@/lib/db'
+import { loadStaffSession, type Session } from '@/lib/staff-session'
+import type { StaffRole } from '@/lib/types'
 
-// Staff sign in with a username. Supabase Auth needs an email, so each
-// username maps to an address on a domain that never receives mail.
-// Keep this in sync with scripts/create-staff.mjs.
+export type { Session } from '@/lib/staff-session'
+export { USERNAME_PATTERN } from '@/lib/better-auth/rules'
+
+// Supabase only, for src/app/(app)/staff/actions.ts until staff management
+// moves to Better Auth (step A4). Better Auth stores the username itself.
 export const STAFF_EMAIL_DOMAIN = process.env.STAFF_EMAIL_DOMAIN || 'staff.invalid'
-
 export function usernameToEmail(username: string) {
   return `${username.trim().toLowerCase()}@${STAFF_EMAIL_DOMAIN}`
 }
 
-export const USERNAME_PATTERN = /^[a-z0-9._-]{3,32}$/
-
-export type Session = {
-  staff: Staff
-  property: Property
-}
-
-// The signed-in, active staff member and their hotel — or null.
-export const getSession = cache(async (): Promise<Session | null> => {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return null
-
-  const { data: staff } = await supabase
-    .from('staff')
-    .select('user_id, property_id, username, display_name, role, active')
-    .eq('user_id', user.id)
-    .maybeSingle<Staff>()
-  if (!staff || !staff.active) return null
-
-  const { data: property } = await supabase
-    .from('properties')
-    .select('id, inn_code, name, retention_days, trace_window_days, stay_retention_days, check_due_hours, request_retention_days')
-    .eq('id', staff.property_id)
-    .single<Property>()
-  if (!property) return null
-
-  return { staff, property }
+// The Better Auth login behind this request's session cookie, or null.
+// Checked against the database on every call (no cookie cache), so ending a
+// session takes effect on the very next request.
+// headers() comes first: it marks every page that checks the session as
+// rendered per request, so `next build` never tries to sign in.
+export const currentLogin = cache(async (): Promise<{ userId: string } | null> => {
+  const requestHeaders = await headers()
+  const auth = await getAuth()
+  const result = await auth.api.getSession({ headers: requestHeaders })
+  return result ? { userId: result.user.id } : null
 })
+
+// The signed-in, ACTIVE staff member and their hotel — or null. Read as that
+// staff member, so row-level security decides exactly as it will for pages.
+export const getSession = cache(async (): Promise<Session | null> => {
+  const login = await currentLogin()
+  if (!login) return null
+  return withStaff(login.userId, loadStaffSession)
+})
+
+// Ends the current session (database row and cookie). Safe to call when
+// there is no session.
+export async function endCurrentSession(): Promise<void> {
+  const requestHeaders = await headers()
+  const auth = await getAuth()
+  try {
+    await auth.api.signOut({ headers: requestHeaders })
+  } catch {
+    // No session to end: nothing to do.
+  }
+}
 
 // Roles that work with found items (logging, storing, returning).
 export const ITEM_ROLES: StaffRole[] = ['housekeeping', 'front_office', 'manager']
