@@ -1,7 +1,10 @@
 // The app's single Better Auth instance, created on first use from the
 // environment (so `next build` needs no credentials) and checked once to be
 // logged in as auth_service before it serves any request.
+// nextCookies() lets server actions (sign-out, finishing sign-in) set and clear
+// the session cookie; it must be the last plugin.
 import 'server-only'
+import { nextCookies } from 'better-auth/next-js'
 import { assertAuthService, createAuthPool } from '@/lib/db/auth-pool'
 import { makeAuth, type Auth } from './config'
 
@@ -27,6 +30,7 @@ export async function getAuth(): Promise<Auth> {
       baseURL: authBaseURL(),
       secret: need('BETTER_AUTH_SECRET'),
       ipHeader: process.env.AUTH_IP_HEADER || undefined,
+      plugins: [nextCookies()],
     })
     state.checked = assertAuthService(pool).catch((e) => {
       state.auth = undefined

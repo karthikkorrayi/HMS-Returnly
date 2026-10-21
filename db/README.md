@@ -14,6 +14,19 @@ While `supabase/migrations/` still exists (until launch), change both folders to
 `tests/migrations-sync.test.mjs` fails if the copies drift from the originals. Railway-only files
 must be listed in its `RAILWAY_ONLY` set.
 
+## Local development database
+
+```bash
+npm run db:local:setup          # creates returnly_dev on Postgres at localhost:5432
+```
+
+`scripts/local-db-setup.mjs` does what Railway will: the bootstrap as a superuser, every migration
+as `app_owner` with the runner, then the DEMO seed (synthetic data only). It refuses anything that is
+not on this computer, never drops or empties anything, and on an existing database only applies new
+migrations, so run it again after pulling new ones. It prints the three connection strings for
+`.env.local`. Then create a login with `npm run create-staff` (it asks for the password twice).
+Set `LOCAL_PG_URL` if your local server is not `postgresql://localhost:5432/postgres`.
+
 ## Running migrations
 
 ```bash

@@ -8,15 +8,12 @@
 //     ending a session takes effect on the very next request;
 //   * sign-in attempts are rate limited and the counters are stored in Postgres;
 //   * telemetry is off.
-import { betterAuth } from 'better-auth'
+import { betterAuth, type BetterAuthPlugin } from 'better-auth'
 import { username } from 'better-auth/plugins'
 import { randomUUID } from 'node:crypto'
+import { SESSION_HOURS, SIGN_IN_ATTEMPTS_PER_MINUTE, MIN_PASSWORD, MAX_PASSWORD, USERNAME_PATTERN } from './rules'
 
-export const USERNAME_PATTERN = /^[a-z0-9._-]{3,32}$/
-export const MIN_PASSWORD = 10
-export const MAX_PASSWORD = 128
-export const SESSION_HOURS = 12
-export const SIGN_IN_ATTEMPTS_PER_MINUTE = 5
+export { USERNAME_PATTERN, MIN_PASSWORD, MAX_PASSWORD, SESSION_HOURS, SIGN_IN_ATTEMPTS_PER_MINUTE } from './rules'
 
 type BetterAuthOptions = Parameters<typeof betterAuth>[0]
 
@@ -31,6 +28,8 @@ export type AuthConfig = {
   ipHeader?: string
   /** Secure cookies; defaults to true when baseURL is https. */
   secure?: boolean
+  /** Added after the username plugin, e.g. nextCookies() in the app (it must be last). */
+  plugins?: BetterAuthPlugin[]
 }
 
 const fields = (map: Record<string, string>) => map
@@ -101,6 +100,7 @@ export function makeAuth(cfg: AuthConfig) {
         usernameValidator: (u) => USERNAME_PATTERN.test(u),
         schema: { user: { fields: { displayUsername: 'display_username' } } },
       }),
+      ...(cfg.plugins ?? []),
     ],
   })
 }

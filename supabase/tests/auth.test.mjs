@@ -5,6 +5,7 @@
 // regress (docs/AUTH_SPIKE_REPORT.md): S2 creation and no sign-up, S3 ids and
 // RLS, S4 deactivation and reset, S5 rate limits, S8 no hashes, S9 cookies,
 // S10 identical errors, S11 login cost, plus the cross-site check on POST.
+// Step A3: the session lookup pages use (loadStaffSession) and create-staff.
 // Secrets are random per run and never printed.
 import { openTestDb } from './test-db.mjs'
 import { readFileSync } from 'node:fs'
@@ -16,6 +17,9 @@ import { fromOurSite, crossSiteResponse } from '../../src/lib/better-auth/origin
 import { createStaffLogin, resetStaffPassword, endStaffSessions } from '../../src/lib/better-auth/staff-logins.ts'
 import { createAuthPool, assertAuthService, AuthPoolError } from '../../src/lib/db/auth-pool.ts'
 import { createDb } from '../../src/lib/db/core.ts'
+import { loadStaffSession } from '../../src/lib/staff-session.ts'
+import { addStaffMember } from '../../src/lib/better-auth/add-staff.ts'
+import { StaffLoginError } from '../../src/lib/better-auth/staff-logins.ts'
 
 const ROOT = new URL('../..', import.meta.url).pathname.replace(/\/$/, '')
 const { db, kind, connectAs, urlFor, close } = await openTestDb('auth')
@@ -156,6 +160,44 @@ const t0 = performance.now()
 const burst = await Promise.all(Array.from({ length: 30 }, (_, i) => call('/sign-in/username', { body: { username: `load.${String(i).padStart(2, '0')}`, password: PW }, ip: `10.9.0.${i + 1}` })))
 const ms = performance.now() - t0
 check(burst.every((r) => r.status === 200) && ms < 60_000, `30 simultaneous sign-ins all succeeded in ${(ms / 1000).toFixed(1)} s (target: 30 within 60 s)`)
+
+console.log('\nA3  session lookup (what every staff page sees)')
+const asStaff = (id) => app.withStaff(id, loadStaffSession)
+const s1 = await asStaff(ben)
+check(s1?.staff.username === 'fo-ben' && s1?.staff.role === 'front_office' && s1?.property.inn_code === 'DEMO',
+  'an active staff member gets their own staff row and hotel', JSON.stringify(s1?.staff))
+check(typeof s1?.property.retention_days === 'number', 'hotel settings come back as numbers')
+await owner.query(`update public.staff set active = false where user_id = $1`, [ben])
+check((await asStaff(ben)) === null, 'a deactivated staff member gets no session')
+await owner.query(`update public.staff set active = true where user_id = $1`, [ben])
+const loginOnly = await createStaffLogin(auth, { username: 'no.staff.row', password: PW, name: 'No row' })
+check((await asStaff(loginOnly)) === null, 'a login without a staff row gets no session')
+
+console.log('\nA3  create-staff (addStaffMember)')
+const staffCount = async () => (await owner.query(`select (select count(*)::int from public.staff) s, (select count(*)::int from auth.users) u`)).rows[0]
+const mgr = await addStaffMember(auth, owner, { property: 'demo', username: ' Demo.Manager ', name: 'Demo Manager', role: 'manager', password: PW })
+check(mgr.propertyName === 'Demo Hotel', 'creates a manager at the DEMO hotel (code is case-insensitive)')
+check((await call('/sign-in/username', { body: { username: 'demo.manager', password: PW }, ip: '198.51.100.60' })).status === 200, 'the new manager can sign in')
+check((await asStaff(mgr.userId))?.staff.role === 'manager', 'and gets a manager session')
+const sup = await addStaffMember(auth, owner, { property: 'DEMO', username: 'support.sam', name: 'Sam', role: 'support', password: PW })
+check((await asStaff(sup.userId))?.staff.role === 'support', 'the support role can be created too')
+const countBefore = await staffCount()
+const rejects = async (input, re, msg) => {
+  try { await addStaffMember(auth, owner, { property: 'DEMO', name: 'X', role: 'manager', password: PW, ...input }); fail(msg + ' (accepted)') }
+  catch (e) { check(e instanceof StaffLoginError && re.test(e.message), msg, e.message) }
+}
+await rejects({ username: 'demo.manager' }, /already taken/, 'refuses a username that is already taken')
+await rejects({ username: 'no.staff.row' }, /already taken/, 'refuses a username that already has a login')
+await rejects({ username: 'new.person', property: 'NOPE' }, /No hotel/, 'refuses an unknown hotel code')
+await rejects({ username: 'new.person', role: 'owner' }, /Role must be/, 'refuses an unknown role')
+await rejects({ username: 'new.person', password: 'short' }, /Password must be/, 'refuses a short password')
+await rejects({ username: 'Bad Name!' }, /Username must be/, 'refuses an invalid username')
+const failingInsert = { query: (sql, params) => /insert into public\.staff/.test(sql) ? Promise.reject(new Error('simulated failure')) : owner.query(sql, params) }
+try { await addStaffMember(auth, failingInsert, { property: 'DEMO', username: 'half.made', name: 'X', role: 'manager', password: PW }); fail('a failed staff row was ignored') }
+catch (e) { check(/login was removed again/.test(e.message), 'if the staff row fails, the new login is removed again', e.message) }
+check(JSON.stringify(await staffCount()) === JSON.stringify(countBefore), 'none of those left a login or staff row behind')
+try { await addStaffMember(auth, { query: (s, p) => appPool.query(s, p) }, { property: 'DEMO', username: 'via.app.user', name: 'X', role: 'manager', password: PW }); fail('ran without app_owner') }
+catch (e) { check(/must connect as app_owner/.test(e.message), 'refuses to run unless connected as app_owner', e.message) }
 
 await appPool.end()
 for (const p of pools) await p.end()

@@ -2,36 +2,20 @@
 
 import { redirect } from 'next/navigation'
 import { signInDestination } from '@/lib/sign-in-destination'
-import { createClient } from '@/lib/supabase/server'
-import { USERNAME_PATTERN, usernameToEmail } from '@/lib/auth'
+import { currentLogin, endCurrentSession, getSession } from '@/lib/auth'
 import type { ActionState } from '@/lib/types'
 
-export async function signIn(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const username = String(formData.get('username') ?? '').trim().toLowerCase()
-  const password = String(formData.get('password') ?? '')
-
-  if (!USERNAME_PATTERN.test(username) || !password) {
-    return { error: 'Enter your username and password.' }
+// Step 2 of signing in. Step 1 is the browser posting the username and
+// password to Better Auth (/api/auth/sign-in/username), so its rate limit and
+// our cross-site check apply. Here we only check the new session belongs to
+// an ACTIVE staff member; if not, the session is ended straight away.
+export async function finishSignIn(next: unknown): Promise<ActionState> {
+  if (!(await currentLogin())) {
+    return { error: 'Sign-in did not complete. Please try again.' }
   }
-
-  const supabase = await createClient()
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: usernameToEmail(username),
-    password,
-  })
-  if (error || !data.user) {
-    return { error: 'Username or password is incorrect.' }
-  }
-
-  const { data: staff } = await supabase
-    .from('staff')
-    .select('active')
-    .eq('user_id', data.user.id)
-    .maybeSingle()
-  if (!staff?.active) {
-    await supabase.auth.signOut()
+  if (!(await getSession())) {
+    await endCurrentSession()
     return { error: 'This account is not active. Ask a manager.' }
   }
-
-  redirect(signInDestination(formData.get('next')))
+  redirect(signInDestination(next))
 }

@@ -1,11 +1,20 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { updateSession } from '@/lib/supabase/proxy'
+import { getSessionCookie } from 'better-auth/cookies'
+import { needsSignIn } from '@/lib/sign-in-gate'
+import { signInDestination } from '@/lib/sign-in-destination'
 
-export async function proxy(request: NextRequest) {
-  // API routes (Better Auth at /api/auth/*, and any later ones) check the
-  // session themselves and must answer 401/403 as JSON, never redirect to /login.
-  if (request.nextUrl.pathname.startsWith('/api/')) return NextResponse.next()
-  return updateSession(request)
+// Sends signed-out visitors to /login. This only checks that a Better Auth
+// session cookie is present; it does not touch the database. Pages and server
+// actions check the session and the staff member again before doing anything.
+export function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl
+  if (!needsSignIn(pathname) || getSessionCookie(request)) return NextResponse.next()
+
+  const url = request.nextUrl.clone()
+  url.pathname = '/login'
+  url.search = ''
+  url.searchParams.set('next', signInDestination(pathname))
+  return NextResponse.redirect(url)
 }
 
 export const config = {
