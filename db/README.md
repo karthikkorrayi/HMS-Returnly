@@ -5,12 +5,14 @@ instead of Supabase. Supabase production is unchanged until launch.
 
 | Path | What | Run as | When |
 |---|---|---|---|
-| `bootstrap/000_platform.sql` | Roles `anon`, `authenticated`, `app_user`, `app_owner`; `auth.users`; `auth.uid()`; Supabase's default grants | a superuser | once per new database (safe to repeat) |
+| `bootstrap/000_platform.sql` | Roles `anon`, `authenticated`, `app_user`, `app_owner`, `auth_service`; `auth.users`; `auth.uid()`; Supabase's default grants | a superuser | once per new database (safe to repeat) |
 | `migrations/*.sql` | The eight Supabase migrations, copied. `004` is empty and `008` lacks one block: both only configured Supabase Storage, whose photo rules move to the app in Phase 5 | `app_owner` | in filename order, after the bootstrap; `007` alone in its own transaction |
+| `migrations/20261022000009_auth_tables.sql` | **Railway only.** Sign-in tables for Better Auth in schema `auth` (extends `auth.users`; adds `session`, `account`, `verification`, `rate_limit`), usable only by `auth_service` | `app_owner` | after re-running the bootstrap (it creates `auth_service`) |
 | `migrate.mjs` | The runner: applies `migrations/` in order, one transaction per file, recording each file's SHA-256 in `ops.schema_migrations` | `app_owner` via `MIGRATION_DATABASE_URL` | every deploy (Phase 7 pre-deploy step) |
 
 While `supabase/migrations/` still exists (until launch), change both folders together:
-`tests/migrations-sync.test.mjs` fails if the copies drift from the originals.
+`tests/migrations-sync.test.mjs` fails if the copies drift from the originals. Railway-only files
+must be listed in its `RAILWAY_ONLY` set.
 
 ## Running migrations
 
@@ -43,6 +45,7 @@ transaction as `authenticated` (with the staff user id) or `anon`, so row-level 
 | `app_user` | yes | the web app | nothing by itself; each request runs `SET LOCAL ROLE authenticated` or `anon` inside a transaction |
 | `authenticated` | no | signed-in staff requests | what row-level security and the workflow functions allow |
 | `anon` | no | public customer pages | the four public functions only |
+| `auth_service` | yes | Better Auth (sign-in, sessions) | only the sign-in tables in schema `auth`; no hotel tables or functions; cannot switch roles |
 
 Rules for application code:
 

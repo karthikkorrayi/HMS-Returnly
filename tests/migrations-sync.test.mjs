@@ -1,6 +1,7 @@
 // Guards the Railway copy of the migrations (db/migrations) against drifting
 // from the Supabase originals (supabase/migrations) while both exist.
-// Rule: same file names; every file byte-identical, except
+// Rule: same file names (apart from the Railway-only files listed in
+// RAILWAY_ONLY); every shared file byte-identical, except
 //   004_photo_storage   → comments only (Supabase Storage setup has no
 //                          equivalent in plain Postgres), and
 //   008_customer_requests → identical apart from the Railway note at the top
@@ -25,9 +26,19 @@ const PHOTO_SHA256 = '63368dea05b796be5f3ad892fd02c87b8d1adfbb455eb0c1949438108f
 const REMOVED_BLOCK_START = 'drop policy if exists item_photos_upload on storage.objects;\n'
 const MARKER = '-- [Railway] Supabase Storage policy item_photos_upload removed here; see note at the top.\n\n'
 const NOTE_END = '-- (end of Railway note)\n'
+// Migrations that exist only for Railway (Supabase has its own Auth until
+// launch). Each must be listed here explicitly and sort after every shared file.
+const RAILWAY_ONLY = new Set(['20261022000009_auth_tables.sql'])
 
-test('both folders hold the same migration file names', () => {
-  assert.deepEqual(readdirSync(RAIL).sort(), readdirSync(SUPA).sort())
+test('both folders hold the same migration file names, apart from listed Railway-only files', () => {
+  const rail = readdirSync(RAIL).sort()
+  const supa = readdirSync(SUPA).sort()
+  assert.deepEqual(rail.filter((f) => !RAILWAY_ONLY.has(f)), supa)
+  for (const f of RAILWAY_ONLY) {
+    assert.ok(rail.includes(f), `${f} is listed as Railway-only but missing from db/migrations`)
+    assert.ok(!supa.includes(f), `${f} is listed as Railway-only but also exists in supabase/migrations`)
+    assert.ok(supa.every((s) => s < f), `${f} must sort after every shared migration`)
+  }
 })
 
 test('every migration except 004 and 008 is byte-identical', () => {

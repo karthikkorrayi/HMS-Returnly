@@ -85,15 +85,16 @@ const ledgerExists = async () => (await db.query(`select to_regclass('ops.schema
 const ledgerCount = async () => (await db.query(`select count(*)::int n from ops.schema_migrations`)).rows[0].n
 
 console.log('\nPlan, apply, re-apply')
+const N = readMigrations().length
 const planned = await asOwner(() => migrate(owner, { log: quiet }))
-planned.pending.length === 8 && planned.applied.length === 0 ? pass('plan lists 8 pending files') : fail('plan: ' + JSON.stringify(planned))
+planned.pending.length === N && planned.applied.length === 0 ? pass(`plan lists all ${N} pending files`) : fail('plan: ' + JSON.stringify(planned))
 !(await ledgerExists()) ? pass('planning changed nothing (no ledger created)') : fail('plan created the ledger')
 
 const first = await asOwner(() => migrate(owner, { apply: true, log: quiet }))
-first.applied.length === 8 ? pass('applies all 8 migrations as app_owner (007 then 008 in separate transactions)') : fail('applied ' + first.applied.length)
+first.applied.length === N ? pass(`applies all ${N} migrations as app_owner (one transaction each, so 008 sees 007's new value)`) : fail('applied ' + first.applied.length)
 const ledger = (await db.query(`select filename, sha256 from ops.schema_migrations order by filename`)).rows
 const files = readMigrations()
-ledger.length === 8 && ledger.every((r, i) => r.filename === files[i].name && r.sha256 === files[i].sha256)
+ledger.length === N && ledger.every((r, i) => r.filename === files[i].name && r.sha256 === files[i].sha256)
   ? pass('ledger records every file with its SHA-256') : fail('ledger mismatch')
 const owned = (await db.query(`select r.rolname from pg_class c join pg_roles r on r.oid = c.relowner
   where c.oid = 'public.lost_items'::regclass or c.oid = 'ops.schema_migrations'::regclass`)).rows
@@ -106,7 +107,7 @@ const again = await asOwner(() => migrate(owner, { apply: true, log: quiet }))
 again.applied.length === 0 ? pass('re-running is a no-op') : fail('re-run applied ' + again.applied.length)
 if (real) {
   const cli = await runCli()
-  cli.status === 0 && /8 applied, 0 pending/.test(cli.out) && /up to date/.test(cli.out)
+  cli.status === 0 && new RegExp(`${N} applied, 0 pending`).test(cli.out) && /up to date/.test(cli.out)
     ? pass('command line: plan reports up to date') : fail(`cli exit ${cli.status}: ${cli.out}`)
   !cli.out.includes(DUMMY_PASSWORD) ? pass('command line never prints the password') : fail('password printed')
 }

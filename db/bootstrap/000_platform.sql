@@ -17,6 +17,8 @@
 --                  authenticated or anon inside a transaction.
 --   authenticated  signed-in staff (RLS decides which rows).
 --   anon           public customer pages (four functions only).
+--   auth_service   Better Auth (sign-in, sessions). Only the auth tables in
+--                  schema auth; no hotel data. Separate login and password.
 --
 -- Run once per database as a superuser (Railway's provisioning user). Safe to
 -- run again. Sets no passwords: set them yourself, never in this file.
@@ -38,6 +40,9 @@ begin
   if not exists (select from pg_roles where rolname = 'app_user') then
     create role app_user login noinherit nosuperuser nocreatedb nocreaterole nobypassrls;
   end if;
+  if not exists (select from pg_roles where rolname = 'auth_service') then
+    create role auth_service login noinherit nosuperuser nocreatedb nocreaterole nobypassrls;
+  end if;
 end $$;
 
 -- Enforce the attributes even if the roles already existed (e.g. created by
@@ -46,6 +51,7 @@ alter role anon nologin noinherit nosuperuser nobypassrls;
 alter role authenticated nologin noinherit nosuperuser nobypassrls;
 alter role app_owner nosuperuser nocreatedb nocreaterole nobypassrls;
 alter role app_user noinherit nosuperuser nocreatedb nocreaterole nobypassrls;
+alter role auth_service noinherit nosuperuser nocreatedb nocreaterole nobypassrls;
 
 -- app_user may switch to these two roles, and nothing else. INHERIT FALSE means
 -- it gets none of their privileges unless it explicitly SETs the role.
@@ -56,7 +62,9 @@ grant authenticated to app_user with inherit false, set true;
 do $$
 begin
   execute format('revoke create, temporary on database %I from public', current_database());
-  execute format('grant connect on database %I to app_owner, app_user', current_database());
+  execute format('grant connect on database %I to app_owner, app_user, auth_service', current_database());
+  -- Better Auth uses unqualified table names: point them at schema auth.
+  execute format('alter role auth_service in database %I set search_path = auth', current_database());
   execute format('grant create on database %I to app_owner', current_database());
 end $$;
 
@@ -65,7 +73,7 @@ grant usage, create on schema public to app_owner;
 grant usage on schema public to anon, authenticated;
 
 create schema if not exists auth authorization app_owner;
-grant usage on schema auth to anon, authenticated;
+grant usage on schema auth to anon, authenticated, auth_service;
 
 -- 3. Objects owned by app_owner -----------------------------------------------
 set local role app_owner;
