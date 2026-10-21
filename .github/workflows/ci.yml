@@ -2,7 +2,8 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # railway is the long-lived integration branch for the migration.
+    branches: [main, railway]
   pull_request:
 
 jobs:

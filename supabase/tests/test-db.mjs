@@ -12,9 +12,10 @@
 // tests can never be pointed at a real database by mistake.
 //
 // connectAs(role) opens an extra connection that logs in as another role (for
-// example app_user, exactly as the web app will). It needs a server that trusts
-// local logins without a password (CI and the Docker test container do) and is
-// only available on real Postgres; on PGlite it returns null.
+// example app_user, exactly as the web app will); urlFor(role) returns the
+// matching connection string (for pools). Both need a server that trusts local
+// logins without a password (CI and the Docker test container do) and are only
+// available on real Postgres; on PGlite they return null.
 import { PGlite } from '@electric-sql/pglite'
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]', ''])
@@ -23,7 +24,7 @@ export async function openTestDb(suite) {
   const url = process.env.TEST_DATABASE_URL
   if (!url) {
     const db = new PGlite()
-    return { db, kind: 'PGlite', connectAs: async () => null, close: () => db.close() }
+    return { db, kind: 'PGlite', connectAs: async () => null, urlFor: () => null, close: () => db.close() }
   }
 
   const parsed = new URL(url)
@@ -77,12 +78,17 @@ export async function openTestDb(suite) {
   }
 
   const extra = []
-  const connectAs = async (role) => {
+  // Connection string for this test database, logging in as `role` (no password:
+  // the local test server trusts local logins).
+  const urlFor = (role) => {
     if (!/^[a-z_]+$/.test(role)) throw new Error(`Bad role name: ${role}`)
     const u = new URL(parsed.toString())
     u.username = role
     u.password = ''
-    const c = new pg.Client({ connectionString: u.toString() })
+    return u.toString()
+  }
+  const connectAs = async (role) => {
+    const c = new pg.Client({ connectionString: urlFor(role) })
     await c.connect()
     extra.push(c)
     return { query: wrap(c), exec: (sql) => c.query(sql), end: () => c.end() }
@@ -95,5 +101,5 @@ export async function openTestDb(suite) {
     await admin.end()
   }
   const { rows } = await admin.query(`select current_setting('server_version') as v`)
-  return { db, kind: `Postgres ${rows[0].v}`, connectAs, close }
+  return { db, kind: `Postgres ${rows[0].v}`, connectAs, urlFor, close }
 }
