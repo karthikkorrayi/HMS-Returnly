@@ -1,27 +1,13 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ITEM_ROLES, canManageItems, requireSession } from '@/lib/auth'
-import { createClient } from '@/lib/supabase/server'
-import { signPhotoUrls } from '@/lib/photo-urls'
+import { withStaff } from '@/lib/db'
+import { loadItemDetail } from '@/lib/queries/item-detail'
 import { formatDate, formatDateTime, hotelToday } from '@/lib/format'
-import { MAX_PHOTOS } from '@/lib/photos'
-import {
-  CATEGORY_LABEL,
-  CLOSED_STATUSES,
-  STATUS_LABEL,
-  type CustodyEvent,
-  type GuestCandidate,
-  type Handover,
-  type LostItem,
-  type Staff,
-  type StorageLocation,
-} from '@/lib/types'
+import { CATEGORY_LABEL, CLOSED_STATUSES, STATUS_LABEL } from '@/lib/types'
 import { StatusBadge, TierBadge } from '@/components/Badges'
-import ActionForm from '@/components/ActionForm'
 import NextStep, { ItemTools } from './NextStep'
 import Candidates from './Candidates'
-import AddPhotos from './AddPhotos'
-import { deletePhoto } from './actions'
 
 const HANDOVER_LABEL = {
   in_person: 'Handed to guest in person',
@@ -37,41 +23,24 @@ export default async function ItemPage({
   params: Promise<{ id: string }>
   searchParams: Promise<{ logged?: string; photos_failed?: string }>
 }) {
-  const { staff: me, property } = await requireSession(ITEM_ROLES)
+  const { staff: me } = await requireSession(ITEM_ROLES)
   const { id } = await params
   const flags = await searchParams
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound()
 
-  const supabase = await createClient()
-  const { data: item } = await supabase.from('lost_items').select('*').eq('id', id).maybeSingle<LostItem>()
-  if (!item) notFound()
-
   const manage = canManageItems(me.role)
-  const [photosRes, candidatesRes, eventsRes, handoverRes, locationsRes, staffRes] = await Promise.all([
-    supabase.from('item_photos').select('id, storage_path, uploaded_by, uploaded_at').eq('item_id', id).order('uploaded_at'),
-    manage
-      ? supabase.from('guest_candidates').select('*').eq('item_id', id).order('added_at').returns<GuestCandidate[]>()
-      : Promise.resolve({ data: [] as GuestCandidate[] }),
-    supabase.from('custody_events').select('*').eq('item_id', id).order('id', { ascending: false }).returns<CustodyEvent[]>(),
-    supabase.from('handovers').select('*').eq('item_id', id).maybeSingle<Handover>(),
-    supabase.from('storage_locations').select('id, label, is_secure, active').order('label').returns<StorageLocation[]>(),
-    supabase.from('staff').select('user_id, property_id, username, display_name, role, active').order('display_name').returns<Staff[]>(),
-  ])
+  // One transaction as this staff member: an item from another hotel is
+  // simply not found (row-level security).
+  const detail = await withStaff(me.user_id, (tx) => loadItemDetail(tx, id, { withCandidates: manage }))
+  if (!detail) notFound()
+  const { item, photos, candidates, events, handover, locations, staff } = detail
 
-  const photos = photosRes.data ?? []
-  const candidates = candidatesRes.data ?? []
-  const events = eventsRes.data ?? []
-  const handover = handoverRes.data
-  const locations = locationsRes.data ?? []
-  const staff = staffRes.data ?? []
   const names = Object.fromEntries(staff.map((s) => [s.user_id, s.display_name]))
   const locationName = Object.fromEntries(locations.map((l) => [l.id, l.label]))
-  const urls = await signPhotoUrls(supabase, photos.map((p) => p.storage_path))
 
   const closed = CLOSED_STATUSES.includes(item.status)
   const where = item.found_area_type === 'room' ? `Room ${item.room_number}` : item.area_label
   const pastRetention = !closed && item.dispose_after < hotelToday()
-  const canAddPhotos = !closed && item.value_tier !== 'sensitive' && photos.length < MAX_PHOTOS
 
   const facts: [string, React.ReactNode][] = [
     ['Found in', where],
@@ -163,38 +132,19 @@ export default async function ItemPage({
             {item.value_tier === 'sensitive' && photos.length === 0 && (
               <p className="hint">Sensitive items are not photographed.</p>
             )}
+            {/* Photos move from Supabase Storage to the new photo store in Phase 5.
+                Until then they are listed but not shown, added or deleted here. */}
             {photos.length > 0 && (
               <ul className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {photos.map((p) => (
-                  <li key={p.id} className="space-y-1">
-                    {urls[p.storage_path] ? (
-                      <a href={urls[p.storage_path]} target="_blank" rel="noreferrer" className="block aspect-square overflow-hidden rounded-lg bg-paper">
-                        {/* eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL */}
-                        <img src={urls[p.storage_path]} alt={`Photo of ${item.item_code}`} className="h-full w-full object-cover" />
-                      </a>
-                    ) : (
-                      <div className="flex aspect-square items-center justify-center rounded-lg bg-paper text-sm text-muted">Unavailable</div>
-                    )}
-                    {me.role === 'manager' && (
-                      <ActionForm
-                        action={deletePhoto}
-                        hidden={{ item_id: item.id, photo_id: p.id }}
-                        submitLabel="Delete"
-                        variant="secondary"
-                        confirmText="Delete this photo permanently?"
-                      />
-                    )}
+                  <li key={p.id} className="flex aspect-square items-center justify-center rounded-lg bg-paper text-sm text-muted">
+                    Photo
                   </li>
                 ))}
               </ul>
             )}
-            {canAddPhotos && (
-              <AddPhotos
-                propertyId={property.id}
-                itemId={item.id}
-                userId={me.user_id}
-                remaining={MAX_PHOTOS - photos.length}
-              />
+            {item.value_tier !== 'sensitive' && (
+              <p className="hint">Viewing and adding photos returns with the photo update.</p>
             )}
           </section>
 
