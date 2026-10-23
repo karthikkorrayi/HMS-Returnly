@@ -1,6 +1,7 @@
 import 'server-only'
 import { Pool } from 'pg'
 import { assertAppUser, createDb, type PoolLike } from './core'
+import { returnlyTypes } from './pg-types'
 
 export type { Tx, Row, QueryResult } from './core'
 export { DbGuardError } from './core'
@@ -22,6 +23,8 @@ function pool(): Pool {
       connectionTimeoutMillis: 5_000,
       statement_timeout: 10_000,
       application_name: 'returnly-web',
+      types: returnlyTypes, // dates as 'YYYY-MM-DD', timestamps as ISO strings
+
     })
   }
   return state.pool

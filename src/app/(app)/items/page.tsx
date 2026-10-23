@@ -1,26 +1,13 @@
 import { redirect } from 'next/navigation'
 import { ITEM_ROLES, requireSession } from '@/lib/auth'
-import { createClient } from '@/lib/supabase/server'
-import { signPhotoUrls } from '@/lib/photo-urls'
+import { withStaff } from '@/lib/db'
 import { hotelToday } from '@/lib/format'
-import { CATEGORY_LABEL, type LostItem } from '@/lib/types'
+import { CATEGORY_LABEL } from '@/lib/types'
 import ItemDashboard from '@/components/ItemDashboard'
-import {
-  DASHBOARD_VIEWS,
-  getDashboardView,
-  type DashboardCounts,
-  type DashboardItem,
-} from '@/lib/item-dashboard'
+import { getDashboardView, type DashboardCounts, type DashboardItem } from '@/lib/item-dashboard'
+import { cleanSearch, loadDashboard } from '@/lib/queries/item-dashboard'
 
 const PAGE_SIZE = 12
-
-type DatabaseItem = Pick<
-  LostItem,
-  'id' | 'item_code' | 'description' | 'category' | 'found_area_type' |
-  'room_number' | 'area_label' | 'status' | 'value_tier' | 'dispose_after'
-> & {
-  item_photos: { storage_path: string; uploaded_at: string }[]
-}
 
 export default async function ItemsPage({
   searchParams,
@@ -38,8 +25,7 @@ export default async function ItemsPage({
       : params.view
 
   const selectedView = getDashboardView(requestedView)
-  const q = (typeof params.q === 'string' ? params.q : '')
-    .trim().replace(/[^A-Za-z0-9-]/g, '').slice(0, 20)
+  const q = cleanSearch(params.q)
 
   const requestedPage = Number(params.p)
   const page = Number.isSafeInteger(requestedPage) && requestedPage > 0
@@ -47,87 +33,40 @@ export default async function ItemsPage({
     : 1
 
   const today = hotelToday()
-  const supabase = await createClient()
 
-  let query = supabase
-    .from('lost_items')
-    .select(
-      'id, item_code, description, category, found_area_type, room_number, area_label, status, value_tier, dispose_after, item_photos(storage_path, uploaded_at)',
-      { count: 'exact' }
+  // One transaction as this staff member: row-level security limits it to
+  // their hotel, and the queries filter on property_id as well.
+  let result: Awaited<ReturnType<typeof loadDashboard>> | null = null
+  try {
+    result = await withStaff(staff.user_id, (tx) =>
+      loadDashboard(tx, { propertyId: property.id, view: selectedView.id, search: q, page, pageSize: PAGE_SIZE, today })
     )
-    .eq('property_id', property.id)
-    .in('status', [...selectedView.statuses])
-    .order(
-      selectedView.id === 'retention' ? 'dispose_after' : 'found_at',
-      { ascending: selectedView.id === 'retention' }
-    )
-    .order('id', { ascending: true })
-    .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
+  } catch (e) {
+    console.error('items dashboard', e)
+  }
 
-  if (selectedView.id === 'retention') query = query.lt('dispose_after', today)
-  if (q) query = query.or(`room_number.eq.${q},item_code.ilike.%${q}%`)
-
-  // Summary counts cover the whole hotel, independent of search/pagination.
-  // RLS remains active; explicit property scoping is additional protection.
-  const [listResult, summaryResults] = await Promise.all([
-    query.returns<DatabaseItem[]>(),
-    Promise.all(DASHBOARD_VIEWS.map(async (view) => {
-      let countQuery = supabase
-        .from('lost_items')
-        .select('id', { count: 'exact', head: true })
-        .eq('property_id', property.id)
-        .in('status', [...view.statuses])
-
-      if (view.id === 'retention') {
-        countQuery = countQuery.lt('dispose_after', today)
-      }
-
-      const result = await countQuery
-      return {
-        id: view.id,
-        count: result.error ? null : result.count,
-        failed: Boolean(result.error),
-      }
-    })),
-  ])
-
-  const total = listResult.error ? null : listResult.count
+  const total = result ? result.total : null
   const lastPage = total === null ? null : Math.max(1, Math.ceil(total / PAGE_SIZE))
 
-  if (!listResult.error && lastPage !== null && page > lastPage) {
+  if (lastPage !== null && page > lastPage) {
     const next = new URLSearchParams({ view: selectedView.id })
     if (q) next.set('q', q)
     if (lastPage > 1) next.set('p', String(lastPage))
     redirect(`/items?${next.toString()}`)
   }
 
-  const records = listResult.error ? [] : listResult.data ?? []
-  const counts = Object.fromEntries(
-    summaryResults.map(({ id, count }) => [id, count])
-  ) as DashboardCounts
+  const records = result?.rows ?? []
+  const counts: DashboardCounts = result?.counts ?? { open: null, storage: null, return: null, retention: null, closed: null }
 
-  function firstPhoto(item: DatabaseItem) {
-    if (item.value_tier === 'sensitive') return undefined
-    return [...(item.item_photos ?? [])]
-      .sort((a, b) => a.uploaded_at.localeCompare(b.uploaded_at))[0]?.storage_path
-  }
-
-  let photoUrls: Record<string, string> = {}
-  let photosFailed = false
-  try {
-    photoUrls = await signPhotoUrls(
-      supabase,
-      records.map(firstPhoto).filter((path): path is string => Boolean(path))
-    )
-  } catch {
-    photosFailed = true
-  }
+  // Photos move from Supabase Storage to the new photo store in Phase 5;
+  // until then the dashboard shows the category icon instead of a thumbnail.
+  const photoUrls: Record<string, string> = {}
 
   const retentionStatuses: readonly string[] =
     getDashboardView('retention').statuses
 
   const items: DashboardItem[] = records.map((item) => {
-    const photo = firstPhoto(item)
+    const photo = item.first_photo
     return {
       id: item.id,
       code: item.item_code,
@@ -145,11 +84,7 @@ export default async function ItemsPage({
   })
 
   const errors: string[] = []
-  if (listResult.error) errors.push('Could not load items. Try refreshing the dashboard.')
-  if (summaryResults.some((result) => result.failed)) {
-    errors.push('Some summary counts are unavailable; they are shown as —.')
-  }
-  if (photosFailed) errors.push('Item photos could not be loaded.')
+  if (!result) errors.push('Could not load items. Try refreshing the dashboard. Summary counts are shown as —.')
 
   return (
     <div>
