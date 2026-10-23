@@ -76,7 +76,9 @@ async function err(name, user, sql, params, match) {
     else pass(`${name} (${e.message})`)
   }
 }
-const day = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10)
+// Dates as the hotel sees them (Europe/London, like the database's "today"),
+// so the test passes at any hour (UTC dates differ near midnight in London).
+const day = (n) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London' }).format(new Date(Date.now() + n * 86400000))
 const submit = (booking, extra = {}) => {
   const v = { name: 'Ben Carter', item: 'Bracelet', desc: 'Gold Pandora bracelet with a small heart charm', cat: 'jewellery_watches', colour: 'Gold', brand: 'Pandora', where: 'Bedroom', date: day(-1), ...extra }
   return as('anon', `select public.submit_customer_request('demo', $1, $2, $3, $4, $5, $6, $7, $8, $9::date) as ref`,

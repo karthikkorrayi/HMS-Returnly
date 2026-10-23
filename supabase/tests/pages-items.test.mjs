@@ -57,7 +57,7 @@ const make = async (prop, by, { room = '101', status = 'logged', tier = 'standar
 const photo = async (itemId, path, by, secondsAgo) => {
   await db.exec('set role app_owner')
   try {
-    await db.query(`insert into public.item_photos (item_id, storage_path, uploaded_by, uploaded_at) values ($1, $2, $3, now() - make_interval(secs => $4))`, [itemId, path, by, secondsAgo])
+    return (await db.query(`insert into public.item_photos (item_id, storage_path, uploaded_by, uploaded_at) values ($1, $2, $3, now() - make_interval(secs => $4)) returning id`, [itemId, path, by, secondsAgo])).rows[0].id
   } finally { await db.exec('reset role') }
 }
 
@@ -69,7 +69,7 @@ const e = await make(DEMO, HK, { room: '105', status: 'returned', hoursAgo: 1, d
 const s = await make(DEMO, HK, { room: '106', tier: 'sensitive', hoursAgo: 0, desc: 'Passport' })
 await make(OTHER, OT, { room: '101', desc: 'Other hotel item' })
 await photo(a.id, `${DEMO}/${a.id}/second.jpg`, HK, 10)
-await photo(a.id, `${DEMO}/${a.id}/first.jpg`, HK, 60)
+const firstId = await photo(a.id, `${DEMO}/${a.id}/first.jpg`, HK, 60)
 await photo(s.id, `${DEMO}/${s.id}/passport.jpg`, HK, 10)
 
 let pool
@@ -119,7 +119,7 @@ const other = await load({}, OT, OTHER)
 check(other.total === 1 && other.rows[0].description === 'Other hotel item', 'the other hotel sees only its own item')
 const sneaky = await load({}, HK, OTHER)
 check(sneaky.total === 0 && sneaky.counts.open === 0, 'asking for another hotel’s id returns nothing (RLS)')
-check(open.rows.find((r) => r.id === a.id).first_photo.endsWith('/first.jpg'), 'thumbnail is the earliest photo')
+check(open.rows.find((r) => r.id === a.id).first_photo === firstId, 'thumbnail is the earliest photo (by photo id)')
 check(open.rows.find((r) => r.id === s.id).first_photo === null, 'sensitive items never get a thumbnail')
 check(open.rows.find((r) => r.id === b.id).first_photo === null, 'items without photos have none')
 

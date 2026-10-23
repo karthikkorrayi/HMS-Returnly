@@ -1,17 +1,9 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
-
-export const MAX_PHOTOS = 3
+// Browser side of photo upload: shrink and re-encode on the phone, then send
+// each photo to the app (/api/items/<id>/photos), which checks the staff
+// member, cleans the file again and stores it in the private bucket.
+export { MAX_PHOTOS } from './photo-rules'
 const MAX_EDGE = 1600
 const QUALITY = 0.8
-
-// crypto.randomUUID only exists on HTTPS/localhost. Phones testing against a
-// dev server on http://<lan-ip>:3000 don't have it, so fall back to
-// getRandomValues, which works everywhere.
-function randomId(): string {
-  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
-  const bytes = crypto.getRandomValues(new Uint8Array(16))
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
-}
 
 // Re-encodes a camera photo as a JPEG no larger than 1600px on its longest
 // side. Drawing through a canvas drops all EXIF metadata, including GPS.
@@ -38,30 +30,23 @@ export async function compressPhoto(file: File): Promise<Blob> {
   )
 }
 
-// Uploads photos for an item and records them. Returns how many failed.
-export async function uploadItemPhotos(
-  supabase: SupabaseClient,
-  opts: { propertyId: string; itemId: string; userId: string; files: File[] }
-): Promise<{ failed: number; lastError: string | null }> {
+// Uploads photos for an item, one request per photo. Returns how many failed.
+export async function uploadItemPhotos(itemId: string, files: File[]): Promise<{ failed: number; lastError: string | null }> {
   let failed = 0
   let lastError: string | null = null
 
-  for (const file of opts.files) {
+  for (const file of files) {
     try {
       const blob = await compressPhoto(file)
-      const path = `${opts.propertyId}/${opts.itemId}/${randomId()}.jpg`
-
-      const { error: uploadError } = await supabase.storage
-        .from('item-photos')
-        .upload(path, blob, { contentType: 'image/jpeg', upsert: false })
-      if (uploadError) throw uploadError
-
-      const { error: rowError } = await supabase
-        .from('item_photos')
-        .insert({ item_id: opts.itemId, storage_path: path, uploaded_by: opts.userId })
-      if (rowError) {
-        await supabase.storage.from('item-photos').remove([path])
-        throw rowError
+      const res = await fetch(`/api/items/${encodeURIComponent(itemId)}/photos`, {
+        method: 'POST',
+        headers: { 'content-type': 'image/jpeg' },
+        credentials: 'same-origin',
+        body: blob,
+      })
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: string } | null
+        throw new Error(data?.error ?? 'Upload failed')
       }
     } catch (e) {
       failed++

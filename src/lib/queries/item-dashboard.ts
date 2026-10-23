@@ -11,7 +11,7 @@ export type DashboardRow = Pick<
   'id' | 'item_code' | 'description' | 'category' | 'found_area_type' |
   'room_number' | 'area_label' | 'status' | 'value_tier' | 'dispose_after'
 > & {
-  /** Storage path of the earliest photo; always null for sensitive items. */
+  /** Id of the earliest photo (shown via /api/photos/<id>); always null for sensitive items. */
   first_photo: string | null
 }
 
@@ -52,7 +52,7 @@ export async function loadDashboard(tx: Tx, q: DashboardQuery): Promise<{ rows: 
       `select i.id, i.item_code, i.description, i.category, i.found_area_type,
               i.room_number, i.area_label, i.status::text as status, i.value_tier::text as value_tier, i.dispose_after,
               case when i.value_tier = 'sensitive' then null else (
-                select p.storage_path from public.item_photos p
+                select p.id from public.item_photos p
                  where p.item_id = i.id order by p.uploaded_at, p.id limit 1
               ) end as first_photo
          from public.lost_items i

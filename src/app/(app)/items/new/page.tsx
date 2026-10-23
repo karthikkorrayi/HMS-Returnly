@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { ITEM_ROLES, requireSession } from '@/lib/auth'
-import { createClient } from '@/lib/supabase/server'
+import { withStaff } from '@/lib/db'
 import type { RoomCheck } from '@/lib/types'
 import LogItemForm from './LogItemForm'
 
@@ -9,27 +9,21 @@ export default async function NewItemPage({
 }: {
   searchParams: Promise<{ room?: string; check?: string }>
 }) {
-  const { staff, property } = await requireSession(ITEM_ROLES)
+  const { staff } = await requireSession(ITEM_ROLES)
   const params = await searchParams
-  const supabase = await createClient()
-
-  const { data: rooms } = await supabase
-    .from('rooms')
-    .select('room_number')
-    .order('room_number')
-    .returns<{ room_number: string }[]>()
+  // Read as this staff member (row-level security: their hotel only).
+  const checkId = params.check && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.check) ? params.check : null
+  const { rooms, found } = await withStaff(staff.user_id, async (tx) => ({
+    rooms: (await tx.query<{ room_number: string }>(`select room_number from public.rooms order by room_number`)).rows,
+    found: checkId
+      ? (await tx.query<Pick<RoomCheck, 'id' | 'room_number' | 'outcome'>>(
+          `select id, room_number, outcome::text as outcome from public.room_checks where id = $1`, [checkId])).rows[0]
+      : undefined,
+  }))
 
   // Opened from a room check ("Items found – log them"): lock the item to that
   // room and link it to the check, so tracing knows which departure it followed.
-  let check: Pick<RoomCheck, 'id' | 'room_number' | 'outcome'> | null = null
-  if (params.check && /^[0-9a-f-]{36}$/i.test(params.check)) {
-    const { data } = await supabase
-      .from('room_checks')
-      .select('id, room_number, outcome')
-      .eq('id', params.check)
-      .maybeSingle<Pick<RoomCheck, 'id' | 'room_number' | 'outcome'>>()
-    if (data?.outcome === 'items_found') check = data
-  }
+  const check = found?.outcome === 'items_found' ? found : null
   const roomFromLink =
     check?.room_number ??
     (params.room && (rooms ?? []).some((r) => r.room_number === params.room) ? params.room : undefined)
@@ -47,8 +41,6 @@ export default async function NewItemPage({
         </p>
       )}
       <LogItemForm
-        propertyId={property.id}
-        userId={staff.user_id}
         rooms={(rooms ?? []).map((r) => r.room_number)}
         initialRoom={roomFromLink}
         roomCheckId={check?.id}

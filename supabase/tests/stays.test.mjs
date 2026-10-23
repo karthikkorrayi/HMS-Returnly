@@ -77,7 +77,10 @@ async function err(name, user, sql, params, match) {
     else pass(`${name} (${e.message})`)
   }
 }
-const daysAgo = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10)
+// Dates as the hotel sees them (Europe/London, like the database's "today"):
+// using the UTC date made this test fail every night between midnight in
+// London and midnight UTC.
+const daysAgo = (n) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London' }).format(new Date(Date.now() - n * 86400000))
 const board = async (user) =>
   Object.fromEntries((await as(user, `select * from public.room_board()`)).rows.map((r) => [r.room_number, r]))
 

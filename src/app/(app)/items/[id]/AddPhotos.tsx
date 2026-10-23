@@ -2,21 +2,10 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import { uploadItemPhotos } from '@/lib/photos'
 import PhotoPicker from '@/components/PhotoPicker'
 
-export default function AddPhotos({
-  propertyId,
-  itemId,
-  userId,
-  remaining,
-}: {
-  propertyId: string
-  itemId: string
-  userId: string
-  remaining: number
-}) {
+export default function AddPhotos({ itemId, remaining }: { itemId: string; remaining: number }) {
   const router = useRouter()
   const [files, setFiles] = useState<File[]>([])
   const [busy, setBusy] = useState(false)
@@ -25,12 +14,7 @@ export default function AddPhotos({
   async function upload() {
     setBusy(true)
     setError(null)
-    const { failed, lastError } = await uploadItemPhotos(createClient(), {
-      propertyId,
-      itemId,
-      userId,
-      files,
-    })
+    const { failed, lastError } = await uploadItemPhotos(itemId, files)
     setBusy(false)
     if (failed > 0) {
       setError(`${failed} photo${failed > 1 ? 's' : ''} did not upload: ${lastError}`)
