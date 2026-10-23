@@ -6,6 +6,7 @@
 // RLS, S4 deactivation and reset, S5 rate limits, S8 no hashes, S9 cookies,
 // S10 identical errors, S11 login cost, plus the cross-site check on POST.
 // Step A3: the session lookup pages use (loadStaffSession) and create-staff.
+// Step A4: managers add staff, set passwords and change access (staff-admin).
 // Secrets are random per run and never printed.
 import { openTestDb } from './test-db.mjs'
 import { readFileSync } from 'node:fs'
@@ -20,6 +21,7 @@ import { createDb } from '../../src/lib/db/core.ts'
 import { loadStaffSession } from '../../src/lib/staff-session.ts'
 import { addStaffMember } from '../../src/lib/better-auth/add-staff.ts'
 import { StaffLoginError } from '../../src/lib/better-auth/staff-logins.ts'
+import { addStaff, setStaffPassword, setStaffActive, StaffAdminError } from '../../src/lib/staff-admin.ts'
 
 const ROOT = new URL('../..', import.meta.url).pathname.replace(/\/$/, '')
 const { db, kind, connectAs, urlFor, close } = await openTestDb('auth')
@@ -198,6 +200,63 @@ catch (e) { check(/login was removed again/.test(e.message), 'if the staff row f
 check(JSON.stringify(await staffCount()) === JSON.stringify(countBefore), 'none of those left a login or staff row behind')
 try { await addStaffMember(auth, { query: (s, p) => appPool.query(s, p) }, { property: 'DEMO', username: 'via.app.user', name: 'X', role: 'manager', password: PW }); fail('ran without app_owner') }
 catch (e) { check(/must connect as app_owner/.test(e.message), 'refuses to run unless connected as app_owner', e.message) }
+
+console.log('\nA4  managers manage staff (staff page)')
+const W = app.withStaff
+const logins = async () => (await owner.query(`select count(*)::int n from auth.users`)).rows[0].n
+const a4rejects = async (p, re, msg) => {
+  try { await p; fail(msg + ' (accepted)') } catch (e) { check(e instanceof StaffAdminError && re.test(e.message), msg, e.message) }
+}
+const OTHER = (await owner.query(`insert into public.properties (inn_code, name) values ('OTHR', 'Other Hotel') returning id`)).rows[0].id
+const otherMgr = await addStaffMember(auth, owner, { property: 'OTHR', username: 'other.manager', name: 'Other Manager', role: 'manager', password: PW })
+const otherHk = await addStaffMember(auth, owner, { property: 'OTHR', username: 'other.hk', name: 'Other HK', role: 'housekeeping', password: PW })
+check(Boolean(OTHER), 'a second hotel exists for the cross-hotel checks')
+
+const cara = await addStaff(auth, W, mgr.userId, { username: 'HK.Cara', displayName: ' Cara ', role: 'housekeeping', password: PW })
+const caraSession = await asStaff(cara)
+check(caraSession?.staff.username === 'hk.cara' && caraSession?.staff.role === 'housekeeping' && caraSession?.property.inn_code === 'DEMO',
+  'a manager adds a housekeeper to their own hotel', JSON.stringify(caraSession?.staff))
+const caraCookie = cookieOf(await call('/sign-in/username', { body: { username: 'hk.cara', password: PW }, ip: '198.51.100.70' }))
+check((await session(caraCookie))?.user?.id === cara, 'the new person can sign in')
+
+let n0 = await logins()
+await a4rejects(addStaff(auth, W, mgr.userId, { username: 'hk.cara', displayName: 'X', role: 'housekeeping', password: PW }), /already taken/, 'refuses a username taken in the same hotel')
+await a4rejects(addStaff(auth, W, mgr.userId, { username: 'other.hk', displayName: 'X', role: 'housekeeping', password: PW }), /already taken/, 'refuses a username taken in another hotel')
+await a4rejects(addStaff(auth, W, ben, { username: 'sneaky.one', displayName: 'X', role: 'manager', password: PW }), /Only managers/, 'the database refuses a non-manager adding staff')
+await a4rejects(addStaff(auth, W, mgr.userId, { username: 'x.y', displayName: 'X', role: 'owner', password: PW }), /Choose a role/, 'refuses an unknown role')
+await a4rejects(addStaff(auth, W, mgr.userId, { username: 'x.y', displayName: 'X', role: 'support', password: 'short' }), /Password must be/, 'refuses a short password')
+await a4rejects(addStaff(auth, W, mgr.userId, { username: 'No Spaces', displayName: 'X', role: 'support', password: PW }), /Username must be/, 'refuses an invalid username')
+check((await logins()) === n0, 'none of the refused attempts left a login behind')
+
+try { await W(mgr.userId, (tx) => tx.query(`insert into public.staff (user_id, property_id, username, display_name, role) values ($1, $2, 'direct.x', 'X', 'manager')`, [loginOnly, DEMO])); fail('a manager wrote public.staff directly') }
+catch (e) { check(/row-level security/.test(e.message), 'even a manager cannot write public.staff directly (only through the functions)', e.message) }
+const direct = await W(mgr.userId, (tx) => tx.query(`update public.staff set active = false where user_id = $1`, [cara]))
+check(direct.rowCount === 0 && (await asStaff(cara)) !== null, 'a direct UPDATE of public.staff changes nothing')
+
+console.log('\nA4  new password')
+const PW3 = randomBytes(18).toString('base64url')
+await setStaffPassword(auth, W, mgr.userId, cara, PW3)
+check((await session(caraCookie)) === null, 'setting a new password signs that person out everywhere')
+check((await call('/sign-in/username', { body: { username: 'hk.cara', password: PW3 }, ip: '198.51.100.71' })).status === 200, 'the new password works')
+check((await call('/sign-in/username', { body: { username: 'hk.cara', password: PW }, ip: '198.51.100.72' })).status !== 200, 'the old one does not')
+await a4rejects(setStaffPassword(auth, W, mgr.userId, otherHk.userId, PW3), /not found/, 'cannot set a password for staff of another hotel')
+await a4rejects(setStaffPassword(auth, W, mgr.userId, mgr.userId, PW3), /own password/, 'cannot reset their own password from the staff page')
+await a4rejects(setStaffPassword(auth, W, ben, cara, PW3), /Only managers/, 'a non-manager is refused (checked in the database)')
+await a4rejects(setStaffPassword(auth, W, mgr.userId, 'not-a-uuid', PW3), /not found/, 'a malformed id is refused')
+
+console.log('\nA4  deactivate / reactivate')
+const caraCookie2 = cookieOf(await call('/sign-in/username', { body: { username: 'hk.cara', password: PW3 }, ip: '198.51.100.73' }))
+await setStaffActive(auth, W, mgr.userId, cara, false)
+check((await session(caraCookie2)) === null, 'deactivating ends their sessions at once')
+check((await asStaff(cara)) === null, 'and they get no staff session afterwards')
+await a4rejects(setStaffPassword(auth, W, mgr.userId, cara, PW3), /Reactivate/, 'no new password for a deactivated person')
+await a4rejects(setStaffActive(auth, W, mgr.userId, mgr.userId, false), /own access/, 'the database refuses a manager deactivating themselves')
+await a4rejects(setStaffActive(auth, W, mgr.userId, otherHk.userId, false), /not found/, 'cannot deactivate staff of another hotel')
+check((await asStaff(otherHk.userId)) !== null, '(the other hotel’s staff member is still active)')
+await a4rejects(setStaffActive(auth, W, ben, anna, false), /Only managers/, 'a non-manager is refused by the database')
+await a4rejects(setStaffActive(auth, W, otherMgr.userId, cara, true), /not found/, 'another hotel’s manager cannot reactivate them')
+await setStaffActive(auth, W, mgr.userId, cara, true)
+check((await asStaff(cara))?.staff.active === true, 'reactivating restores access')
 
 await appPool.end()
 for (const p of pools) await p.end()

@@ -10,13 +10,6 @@ import type { StaffRole } from '@/lib/types'
 export type { Session } from '@/lib/staff-session'
 export { USERNAME_PATTERN } from '@/lib/better-auth/rules'
 
-// Supabase only, for src/app/(app)/staff/actions.ts until staff management
-// moves to Better Auth (step A4). Better Auth stores the username itself.
-export const STAFF_EMAIL_DOMAIN = process.env.STAFF_EMAIL_DOMAIN || 'staff.invalid'
-export function usernameToEmail(username: string) {
-  return `${username.trim().toLowerCase()}@${STAFF_EMAIL_DOMAIN}`
-}
-
 // The Better Auth login behind this request's session cookie, or null.
 // Checked against the database on every call (no cookie cache), so ending a
 // session takes effect on the very next request.

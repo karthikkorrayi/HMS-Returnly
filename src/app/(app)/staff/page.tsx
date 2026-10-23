@@ -1,19 +1,20 @@
 import { requireSession } from '@/lib/auth'
-import { createClient } from '@/lib/supabase/server'
+import { withStaff } from '@/lib/db'
 import { ROLE_LABEL, type Staff } from '@/lib/types'
 import ActionForm from '@/components/ActionForm'
 import { createStaff, resetPassword, setActive } from './actions'
 
 export default async function StaffPage() {
   const { staff: me } = await requireSession(['manager'])
-  const supabase = await createClient()
-  const { data } = await supabase
-    .from('staff')
-    .select('user_id, property_id, username, display_name, role, active')
-    .order('active', { ascending: false })
-    .order('display_name')
-    .returns<Staff[]>()
-  const staff = data ?? []
+  // Read as the manager: row-level security returns only their hotel's staff.
+  const staff = (
+    await withStaff(me.user_id, (tx) =>
+      tx.query<Staff>(
+        `select user_id, property_id, username, display_name, role::text as role, active
+           from public.staff order by active desc, display_name`
+      )
+    )
+  ).rows
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
