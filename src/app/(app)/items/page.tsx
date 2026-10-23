@@ -58,10 +58,6 @@ export default async function ItemsPage({
   const records = result?.rows ?? []
   const counts: DashboardCounts = result?.counts ?? { open: null, storage: null, return: null, retention: null, closed: null }
 
-  // Photos move from Supabase Storage to the new photo store in Phase 5;
-  // until then the dashboard shows the category icon instead of a thumbnail.
-  const photoUrls: Record<string, string> = {}
-
   const retentionStatuses: readonly string[] =
     getDashboardView('retention').statuses
 
@@ -79,7 +75,8 @@ export default async function ItemsPage({
       tier: item.value_tier,
       retention: retentionStatuses.includes(item.status) &&
         item.dispose_after < today,
-      photoUrl: photo ? photoUrls[photo] : undefined,
+      // Served by the app after a permission check (decision A).
+      photoUrl: photo ? `/api/photos/${photo}` : undefined,
     }
   })
 
