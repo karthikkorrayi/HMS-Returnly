@@ -1,18 +1,11 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requireSession } from '@/lib/auth'
-import { createClient } from '@/lib/supabase/server'
+import { withStaff } from '@/lib/db'
+import { loadRequestDetail, loadRequestMatches } from '@/lib/queries/requests'
 import { formatDate, formatDateTime } from '@/lib/format'
-import { CATEGORY_LABEL, STATUS_LABEL, TIER_LABEL, type Staff } from '@/lib/types'
-import {
-  OPEN_REQUEST_STATUSES,
-  REQUEST_STATUS_LABEL,
-  type CustomerRequest,
-  type MatchRow,
-  type RequestEvent,
-  type RequestMessage,
-  type RequestNote,
-} from '@/lib/requests/types'
+import { CATEGORY_LABEL, STATUS_LABEL, TIER_LABEL, type ItemStatus } from '@/lib/types'
+import { OPEN_REQUEST_STATUSES, REQUEST_STATUS_LABEL, type MatchRow } from '@/lib/requests/types'
 import ActionForm from '@/components/ActionForm'
 import { MatchBandBadge, RequestStatusBadge } from '@/components/RequestBadges'
 import { addRequestNote, approveRequest, assignRequest, changeRequestStatus, messageCustomer } from '../actions'
@@ -34,27 +27,21 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
   const { id } = await params
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound()
 
-  const supabase = await createClient()
   // Row-level security returns nothing unless you're Admin or the assigned Support member.
-  const { data: req } = await supabase.from('customer_requests').select('*').eq('id', id).maybeSingle<CustomerRequest>()
-  if (!req) notFound()
+  const detail = await withStaff(me.user_id, (tx) => loadRequestDetail(tx, id))
+  if (!detail) notFound()
+  const { req, messages, notes, events, staff } = detail
+  const approvedItem = detail.approvedItem as { id: string; item_code: string; description: string; status: ItemStatus } | null
 
-  const [msgRes, noteRes, eventRes, staffRes, matchRes, approvedRes] = await Promise.all([
-    supabase.from('request_messages').select('id, sender, author_id, body, created_at').eq('request_id', id).order('id'),
-    supabase.from('request_notes').select('id, author_id, body, created_at').eq('request_id', id).order('id', { ascending: false }),
-    supabase.from('request_events').select('*').eq('request_id', id).order('id', { ascending: false }),
-    supabase.from('staff').select('user_id, display_name, role, active').order('display_name'),
-    supabase.rpc('match_request_items', { p_request_id: id }),
-    req.approved_item_id
-      ? supabase.from('lost_items').select('id, item_code, description, status').eq('id', req.approved_item_id).maybeSingle()
-      : Promise.resolve({ data: null }),
-  ])
-  const messages = (msgRes.data ?? []) as RequestMessage[]
-  const notes = (noteRes.data ?? []) as RequestNote[]
-  const events = (eventRes.data ?? []) as RequestEvent[]
-  const staff = (staffRes.data ?? []) as Pick<Staff, 'user_id' | 'display_name' | 'role' | 'active'>[]
-  const matches = (matchRes.data ?? []) as MatchRow[]
-  const approvedItem = approvedRes.data as { id: string; item_code: string; description: string; status: keyof typeof STATUS_LABEL } | null
+  // Matches in their own transaction: if the matcher refuses, the page still shows.
+  let matches: MatchRow[] = []
+  const matchRes: { error: { message: string } | null } = { error: null }
+  try {
+    matches = await withStaff(me.user_id, (tx) => loadRequestMatches(tx, id))
+  } catch (e) {
+    console.error('request matches', e)
+    matchRes.error = { message: 'Possible matches could not be loaded. Reopen the page to try again.' }
+  }
   const names = Object.fromEntries(staff.map((s) => [s.user_id, s.display_name]))
 
   const admin = me.role === 'manager'

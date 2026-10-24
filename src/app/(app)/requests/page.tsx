@@ -1,13 +1,12 @@
 import { requireSession } from '@/lib/auth'
-import { createClient } from '@/lib/supabase/server'
+import { withStaff } from '@/lib/db'
+import { loadStaffNames } from '@/lib/queries/requests'
 import RequestList, { type ListParams } from './RequestList'
 
 // Admin: every customer enquiry for this hotel.
 export default async function CustomerRequestsPage({ searchParams }: { searchParams: Promise<ListParams> }) {
   const { staff: me } = await requireSession(['manager'])
-  const supabase = await createClient()
-  const { data: staff } = await supabase.from('staff').select('user_id, display_name')
-  const names = Object.fromEntries((staff ?? []).map((s) => [s.user_id, s.display_name]))
+  const names = await withStaff(me.user_id, loadStaffNames)
 
   return (
     <div className="space-y-5">
