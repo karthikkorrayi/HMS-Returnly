@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { connection } from 'next/server'
 import ReturnlyIcon from '@/components/ReturnlyIcon'
 import EnquiryChat from '@/components/enquiry/EnquiryChat'
 import { listHotels } from '@/lib/requests/public-actions'
@@ -26,7 +27,8 @@ const STEPS = [
 ] as const
 
 export default async function Home() {
-  // Reads cookies via the Supabase client, so this page is always rendered per request.
+  // The hotel list comes from the database on every request (never at build time).
+  await connection()
   const hotels = await listHotels()
   const today = hotelToday()
 

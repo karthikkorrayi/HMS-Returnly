@@ -4,7 +4,8 @@
 // that validates input, rate-limits, and returns only what the customer may
 // see. Staff data, item records and matches are never returned here.
 
-import { createClient } from '@/lib/supabase/server'
+import { withAnon } from '@/lib/db'
+import { friendly, hotels, reply, requestStatus, submitRequest } from './public-queries'
 import type { CustomerStatusView, EnquiryPayload } from './types'
 
 const REF = /^LF-[0-9A-F]{5}-[0-9A-F]{5}$/
@@ -26,21 +27,25 @@ export async function submitEnquiry(payload: EnquiryPayload): Promise<SubmitResu
   if (description.length < 3) return { ok: false, error: 'Describe the item.' }
   if (lostDate && !/^\d{4}-\d{2}-\d{2}$/.test(lostDate)) return { ok: false, error: 'The date is not valid.' }
 
-  const supabase = await createClient()
-  const { data, error } = await supabase.rpc('submit_customer_request', {
-    p_inn_code: clean(payload.innCode, 10),
-    p_customer_name: name,
-    p_booking_ref: booking,
-    p_item_name: itemName,
-    p_description: description,
-    p_category: optional(payload.category, 40),
-    p_colour: optional(payload.colour, 40),
-    p_brand: optional(payload.brand, 60),
-    p_lost_location: optional(payload.lostLocation, 80),
-    p_lost_date: lostDate || null,
-  })
-  if (error) return { ok: false, error: friendly(error) }
-  return { ok: true, reference: data as string }
+  try {
+    const reference = await withAnon((tx) =>
+      submitRequest(tx, {
+        innCode: clean(payload.innCode, 10),
+        customerName: name,
+        bookingRef: booking,
+        itemName,
+        description,
+        category: optional(payload.category, 40),
+        colour: optional(payload.colour, 40),
+        brand: optional(payload.brand, 60),
+        lostLocation: optional(payload.lostLocation, 80),
+        lostDate: lostDate || null,
+      })
+    )
+    return { ok: true, reference }
+  } catch (e) {
+    return { ok: false, error: logged(e) }
+  }
 }
 
 export type StatusResult = { ok: true; view: CustomerStatusView } | { ok: false; error: string }
@@ -51,35 +56,37 @@ export async function lookupEnquiry(reference: string, bookingRef: string): Prom
   if (!REF.test(ref) || !/^[A-Z0-9-]{3,32}$/.test(booking)) {
     return { ok: false, error: 'Check the reference (like LF-3FA9C-81D2E) and booking ID.' }
   }
-  const supabase = await createClient()
-  const { data, error } = await supabase.rpc('customer_request_status', { p_reference: ref, p_booking_ref: booking })
-  if (error) return { ok: false, error: friendly(error) }
-  return { ok: true, view: data as CustomerStatusView }
+  try {
+    return { ok: true, view: await withAnon((tx) => requestStatus(tx, ref, booking)) }
+  } catch (e) {
+    return { ok: false, error: logged(e) }
+  }
 }
 
 export async function replyToEnquiry(reference: string, bookingRef: string, body: string): Promise<StatusResult> {
   const text = clean(body, 1000)
   if (!text) return { ok: false, error: 'Write a message first.' }
-  const supabase = await createClient()
-  const { error } = await supabase.rpc('customer_reply', {
-    p_reference: clean(reference, 20).toUpperCase(),
-    p_booking_ref: clean(bookingRef, 40).toUpperCase().replace(/\s+/g, ''),
-    p_body: text,
-  })
-  if (error) return { ok: false, error: friendly(error) }
+  try {
+    await withAnon((tx) =>
+      reply(tx, clean(reference, 20).toUpperCase(), clean(bookingRef, 40).toUpperCase().replace(/\s+/g, ''), text)
+    )
+  } catch (e) {
+    return { ok: false, error: logged(e) }
+  }
   return lookupEnquiry(reference, bookingRef)
 }
 
 export async function listHotels(): Promise<{ inn_code: string; name: string }[]> {
-  const supabase = await createClient()
-  const { data } = await supabase.rpc('public_properties')
-  return (data ?? []) as { inn_code: string; name: string }[]
+  try {
+    return await withAnon(hotels)
+  } catch (e) {
+    console.error('public hotel list failed', e)
+    return []
+  }
 }
 
-// Only messages our database functions wrote for customers (`raise exception`,
-// SQLSTATE P0001) are shown. Anything else — network failures, permission or
-// schema errors — becomes a generic message, so nothing technical leaks.
-function friendly(error: { code?: string; message: string }) {
-  if (error.code === 'P0001' && error.message) return error.message
-  return 'Something went wrong on our side. Please try again in a few minutes.'
+// Customer-safe message; anything unexpected is logged for staff, not shown.
+function logged(e: unknown): string {
+  if ((e as { code?: string })?.code !== 'P0001') console.error('public enquiry call failed', e)
+  return friendly(e)
 }
