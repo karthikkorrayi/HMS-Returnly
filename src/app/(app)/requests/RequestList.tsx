@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/server'
+import { withStaff } from '@/lib/db'
+import { cleanRequestSearch, loadRequestList } from '@/lib/queries/requests'
 import { formatDateTime } from '@/lib/format'
 import { CATEGORY_LABEL } from '@/lib/types'
 import {
@@ -7,8 +8,6 @@ import {
   REQUEST_STATUSES,
   REQUEST_STATUS_LABEL,
   type CustomerRequest,
-  type MatchBand,
-  type MatchRow,
   type RequestStatus,
 } from '@/lib/requests/types'
 import { MatchBandBadge, RequestStatusBadge } from '@/components/RequestBadges'
@@ -40,46 +39,29 @@ export default async function RequestList({
   const status = params.status === 'all' || REQUEST_STATUSES.includes(params.status as RequestStatus)
     ? (params.status as RequestStatus | 'all')
     : 'open'
-  const q = (params.q ?? '').replace(/[^A-Za-z0-9 -]/g, '').trim().slice(0, 40)
-  const assigned = ['me', 'unassigned'].includes(params.assigned ?? '') ? params.assigned : 'any'
+  const q = cleanRequestSearch(params.q)
+  const assigned: 'any' | 'me' | 'unassigned' =
+    params.assigned === 'me' || params.assigned === 'unassigned' ? params.assigned : 'any'
   const page = Math.max(1, Math.min(500, Number.parseInt(params.p ?? '1', 10) || 1))
 
-  const supabase = await createClient()
-
-  // Summary counts across everything this user can see.
-  const { data: all } = await supabase.from('customer_requests').select('status').limit(10000)
-  const counts = Object.fromEntries(REQUEST_STATUSES.map((s) => [s, 0])) as Record<RequestStatus, number>
-  for (const r of (all ?? []) as { status: RequestStatus }[]) counts[r.status]++
-  const total = (all ?? []).length
-  const openCount = OPEN_REQUEST_STATUSES.reduce((n, s) => n + counts[s], 0)
-
-  let query = supabase
-    .from('customer_requests')
-    .select('id, reference, customer_name, booking_ref, item_name, category, status, assigned_to, created_at', { count: 'exact' })
-    .order('created_at', { ascending: false })
-    .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
-  if (status === 'open') query = query.in('status', OPEN_REQUEST_STATUSES)
-  else if (status !== 'all') query = query.eq('status', status)
-  if (assigned === 'me') query = query.eq('assigned_to', meId)
-  if (assigned === 'unassigned') query = query.is('assigned_to', null)
-  if (q) {
-    const like = `*${q}*`
-    query = query.or(`reference.ilike.${like},customer_name.ilike.${like},booking_ref.ilike.${like},item_name.ilike.${like}`)
+  // One transaction as this staff member: row-level security limits Support
+  // to the requests assigned to them, whatever the URL says.
+  let result: Awaited<ReturnType<typeof loadRequestList>> | null = null
+  let error: { message: string } | null = null
+  try {
+    result = await withStaff(meId, (tx) =>
+      loadRequestList(tx, { status, search: q, assigned, page, pageSize: PAGE_SIZE, meId })
+    )
+  } catch (e) {
+    console.error('request list', e)
+    error = { message: 'please try again.' }
   }
-  const { data, error, count } = await query
-  const rows = (data ?? []) as Row[]
-  const lastPage = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE))
-
-  // Best match per open request on this page — an indicator only.
-  const best: Record<string, MatchBand | null> = {}
-  await Promise.all(
-    rows
-      .filter((r) => OPEN_REQUEST_STATUSES.includes(r.status))
-      .map(async (r) => {
-        const { data: m } = await supabase.rpc('match_request_items', { p_request_id: r.id })
-        best[r.id] = ((m ?? []) as MatchRow[])[0]?.band ?? null
-      })
-  )
+  const counts = result?.counts ?? (Object.fromEntries(REQUEST_STATUSES.map((st) => [st, 0])) as Record<RequestStatus, number>)
+  const total = result?.total ?? 0
+  const openCount = OPEN_REQUEST_STATUSES.reduce((n, st) => n + counts[st], 0)
+  const rows: Row[] = result?.rows ?? []
+  const lastPage = Math.max(1, Math.ceil((result?.matching ?? 0) / PAGE_SIZE))
+  const best = result?.best ?? {}
 
   const href = (over: Partial<ListParams>) => {
     const sp = new URLSearchParams()
