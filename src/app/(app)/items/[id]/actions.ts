@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { getSession } from '@/lib/auth'
 import { withStaff, type Tx } from '@/lib/db'
 import * as item from '@/lib/item-actions'
+import { deletePhoto as removePhoto, PhotoRejected } from '@/lib/item-photos'
+import { photoStore } from '@/lib/storage'
 import type { ActionState } from '@/lib/types'
 
 // Every action re-checks the session, then runs as that staff member in one
@@ -85,4 +87,20 @@ export async function recordHandover(_p: ActionState, f: FormData) {
       note: optional(f, 'note'),
     })
   )
+}
+
+export async function deletePhoto(_p: ActionState, f: FormData): Promise<ActionState> {
+  const session = await getSession()
+  if (!session) return { error: 'Your session has ended. Sign in again.' }
+  const itemId = str(f, 'item_id')
+  try {
+    await removePhoto(withStaff, photoStore(), session.staff.user_id, itemId, str(f, 'photo_id'))
+  } catch (e) {
+    if (e instanceof PhotoRejected) return { error: e.message }
+    console.error('photo delete failed', e)
+    return { error: 'The photo could not be deleted. Please try again.' }
+  }
+  revalidatePath(`/items/${itemId}`)
+  revalidatePath('/items')
+  return { error: null, ok: true }
 }

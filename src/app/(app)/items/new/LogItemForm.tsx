@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import { MAX_PHOTOS, uploadItemPhotos } from '@/lib/photos'
+import { saveItem } from './actions'
 import { CATEGORIES, PUBLIC_AREAS, TIER_HINT, TIER_LABEL, type ValueTier } from '@/lib/types'
 import PhotoPicker from '@/components/PhotoPicker'
 
@@ -14,14 +14,10 @@ function localNowForInput() {
 }
 
 export default function LogItemForm({
-  propertyId,
-  userId,
   rooms,
   initialRoom,
   roomCheckId,
 }: {
-  propertyId: string
-  userId: string
   rooms: string[]
   initialRoom?: string
   roomCheckId?: string
@@ -59,43 +55,32 @@ export default function LogItemForm({
     }
 
     setBusy('Saving item…')
-    const supabase = createClient()
-    const { data: item, error: insertError } = await supabase
-      .from('lost_items')
-      .insert({
-        property_id: propertyId,
-        found_area_type: areaType,
-        room_number: areaType === 'room' ? rooms.find((r) => r.toUpperCase() === room) : null,
-        area_label: areaType === 'public_area' ? area : null,
-        found_at: foundAt.toISOString(),
-        found_by: userId,
-        category: get('category'),
-        description: get('description'),
-        brand: get('brand') || null,
-        colour: get('colour') || null,
-        value_tier: tier,
-        room_check_id: areaType === 'room' && roomCheckId ? roomCheckId : null,
-        found_spot: areaType === 'room' ? get('found_spot') || null : null,
-        spot_hidden: areaType === 'room' && form.get('spot_hidden') === 'on',
-      })
-      .select('id')
-      .single()
+    const saved = await saveItem({
+      areaType,
+      roomNumber: areaType === 'room' ? rooms.find((r) => r.toUpperCase() === room) ?? null : null,
+      areaLabel: areaType === 'public_area' ? area : null,
+      foundAt: foundAt.toISOString(),
+      category: get('category'),
+      description: get('description'),
+      brand: get('brand') || null,
+      colour: get('colour') || null,
+      valueTier: tier,
+      roomCheckId: areaType === 'room' && roomCheckId ? roomCheckId : null,
+      foundSpot: areaType === 'room' ? get('found_spot') || null : null,
+      spotHidden: areaType === 'room' && form.get('spot_hidden') === 'on',
+    })
 
-    if (insertError || !item) {
+    if ('error' in saved) {
       setBusy(null)
-      setError(`Could not save the item: ${insertError?.message ?? 'unknown error'}`)
+      setError(`Could not save the item: ${saved.error}`)
       return
     }
+    const item = { id: saved.id }
 
     let photoNote = ''
     if (tier !== 'sensitive' && photos.length > 0) {
       setBusy(`Uploading ${photos.length} photo${photos.length > 1 ? 's' : ''}…`)
-      const { failed } = await uploadItemPhotos(supabase, {
-        propertyId,
-        itemId: item.id,
-        userId,
-        files: photos,
-      })
+      const { failed } = await uploadItemPhotos(item.id, photos)
       if (failed > 0) photoNote = `&photos_failed=${failed}`
     }
 

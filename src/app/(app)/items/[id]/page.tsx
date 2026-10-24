@@ -6,8 +6,12 @@ import { loadItemDetail } from '@/lib/queries/item-detail'
 import { formatDate, formatDateTime, hotelToday } from '@/lib/format'
 import { CATEGORY_LABEL, CLOSED_STATUSES, STATUS_LABEL } from '@/lib/types'
 import { StatusBadge, TierBadge } from '@/components/Badges'
+import ActionForm from '@/components/ActionForm'
+import { MAX_PHOTOS } from '@/lib/photo-rules'
 import NextStep, { ItemTools } from './NextStep'
 import Candidates from './Candidates'
+import AddPhotos from './AddPhotos'
+import { deletePhoto } from './actions'
 
 const HANDOVER_LABEL = {
   in_person: 'Handed to guest in person',
@@ -41,6 +45,7 @@ export default async function ItemPage({
   const closed = CLOSED_STATUSES.includes(item.status)
   const where = item.found_area_type === 'room' ? `Room ${item.room_number}` : item.area_label
   const pastRetention = !closed && item.dispose_after < hotelToday()
+  const canAddPhotos = !closed && item.value_tier !== 'sensitive' && photos.length < MAX_PHOTOS
 
   const facts: [string, React.ReactNode][] = [
     ['Found in', where],
@@ -132,20 +137,29 @@ export default async function ItemPage({
             {item.value_tier === 'sensitive' && photos.length === 0 && (
               <p className="hint">Sensitive items are not photographed.</p>
             )}
-            {/* Photos move from Supabase Storage to the new photo store in Phase 5.
-                Until then they are listed but not shown, added or deleted here. */}
             {photos.length > 0 && (
               <ul className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {photos.map((p) => (
-                  <li key={p.id} className="flex aspect-square items-center justify-center rounded-lg bg-paper text-sm text-muted">
-                    Photo
+                  <li key={p.id} className="space-y-1">
+                    {/* Served by the app after a permission check; no shareable link. */}
+                    <a href={`/api/photos/${p.id}`} target="_blank" rel="noreferrer" className="block aspect-square overflow-hidden rounded-lg bg-paper">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- private photo served by /api/photos */}
+                      <img src={`/api/photos/${p.id}`} alt={`Photo of ${item.item_code}`} className="h-full w-full object-cover" />
+                    </a>
+                    {me.role === 'manager' && (
+                      <ActionForm
+                        action={deletePhoto}
+                        hidden={{ item_id: item.id, photo_id: p.id }}
+                        submitLabel="Delete"
+                        variant="secondary"
+                        confirmText="Delete this photo permanently?"
+                      />
+                    )}
                   </li>
                 ))}
               </ul>
             )}
-            {item.value_tier !== 'sensitive' && (
-              <p className="hint">Viewing and adding photos returns with the photo update.</p>
-            )}
+            {canAddPhotos && <AddPhotos itemId={item.id} remaining={MAX_PHOTOS - photos.length} />}
           </section>
 
           {manage && <Candidates item={item} candidates={candidates} names={names} />}
