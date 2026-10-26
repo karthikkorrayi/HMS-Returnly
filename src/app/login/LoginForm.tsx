@@ -29,8 +29,14 @@ async function signIn(_prev: ActionState, formData: FormData): Promise<ActionSta
   } catch {
     return { error: 'Could not reach the server. Check your connection and try again.' }
   }
-  if (res.status === 429) return { error: 'Too many attempts. Wait a minute, then try again.' }
-  if (!res.ok) return { error: 'Username or password is incorrect.' }
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { code?: string; message?: string } | null
+    // A username locked after too many wrong passwords, or a deactivated
+    // account (only reported once the password was right).
+    if ((body?.code === 'USERNAME_LOCKED' || body?.code === 'ACCOUNT_DISABLED') && body.message) return { error: body.message }
+    if (res.status === 429) return { error: 'Too many attempts. Wait a minute, then try again.' }
+    return { error: 'Username or password is incorrect.' }
+  }
 
   return finishSignIn(formData.get('next'))
 }

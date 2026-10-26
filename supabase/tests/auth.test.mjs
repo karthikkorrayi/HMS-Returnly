@@ -131,15 +131,16 @@ const u = await call('/sign-in/username', { body: { username: 'nobody.here', pas
 const wb = await w.text(), ub = await u.text()
 check(w.status === u.status && wb === ub, `identical status and message (${w.status}: ${wb.slice(0, 60)})`)
 
-console.log('\nS5  rate limiting')
+console.log('\nS5  rate limiting (per address: 30 sign-ins a minute)')
+// Different made-up usernames, so only the per-address limit is in play here.
 const codes = []
-for (let i = 0; i < 6; i++) codes.push((await call('/sign-in/username', { body: { username: 'hk.anna', password: WRONG }, ip: '203.0.113.7' })).status)
-check(codes.slice(0, 5).every((c) => c !== 429) && codes[5] === 429, `6th failed sign-in from one IP within a minute is blocked (${codes.join(',')})`)
-const spoof = await call('/sign-in/username', { body: { username: 'hk.anna', password: WRONG }, ip: '203.0.113.7', headers: { 'x-forwarded-for': '192.0.2.99' } })
+for (let i = 0; i < 31; i++) codes.push((await call('/sign-in/username', { body: { username: `rl.${String(i).padStart(2, '0')}`, password: WRONG }, ip: '203.0.113.7' })).status)
+check(codes.slice(0, 30).every((c) => c !== 429) && codes[30] === 429, `31st sign-in from one address within a minute is blocked (30 allowed: a whole shift on one hotel Wi-Fi)`)
+const spoof = await call('/sign-in/username', { body: { username: 'rl.spoof', password: WRONG }, ip: '203.0.113.7', headers: { 'x-forwarded-for': '192.0.2.99' } })
 check(spoof.status === 429, 'changing X-Forwarded-For does not escape the limit (X-Real-IP is used)')
-check((await call('/sign-in/username', { body: { username: 'hk.anna', password: PW }, ip: '203.0.113.8' })).status === 200, 'another IP is not blocked')
+check((await call('/sign-in/username', { body: { username: 'hk.anna', password: PW }, ip: '203.0.113.8' })).status === 200, 'another address is not blocked')
 auth = makeAuth({ database: authPool(), baseURL: BASE, secret: SECRET })
-check((await call('/sign-in/username', { body: { username: 'hk.anna', password: WRONG }, ip: '203.0.113.7' })).status === 429, 'the limit survives a restart (stored in auth.rate_limit)')
+check((await call('/sign-in/username', { body: { username: 'rl.after', password: WRONG }, ip: '203.0.113.7' })).status === 429, 'the limit survives a restart (stored in auth.rate_limit)')
 
 console.log('\nS4  deactivation and password reset')
 const c2 = cookieOf(await call('/sign-in/username', { body: { username: 'hk.anna', password: PW }, ip: '198.51.100.40' }))
@@ -257,6 +258,47 @@ await a4rejects(setStaffActive(auth, W, ben, anna, false), /Only managers/, 'a n
 await a4rejects(setStaffActive(auth, W, otherMgr.userId, cara, true), /not found/, 'another hotel’s manager cannot reactivate them')
 await setStaffActive(auth, W, mgr.userId, cara, true)
 check((await asStaff(cara))?.staff.active === true, 'reactivating restores access')
+
+console.log('\nPhase 6  wrong-password lock per username')
+let ipN = 0
+const ip = () => `100.64.${Math.floor(++ipN / 250)}.${(ipN % 250) + 1}` // a new address each time: only the username lock is in play
+const attempt = async (username, password) => {
+  const r = await call('/sign-in/username', { body: { username, password }, ip: ip() })
+  return { status: r.status, body: await r.json().catch(() => ({})) }
+}
+const benUser = 'fo-ben'
+for (let i = 0; i < 9; i++) await attempt(benUser, WRONG)
+check((await attempt(benUser, PW)).status === 200, '9 wrong passwords, then the right one: signed in (not locked)')
+for (let i = 0; i < 9; i++) await attempt(benUser, WRONG)
+check((await attempt(benUser, PW)).status === 200, 'the right password reset the count to zero')
+const tries = []
+for (let i = 0; i < 10; i++) tries.push((await attempt(benUser, WRONG)).status)
+const locked = await attempt(benUser, PW)
+check(tries.every((c) => c === 401) && locked.status === 429 && locked.body.code === 'USERNAME_LOCKED',
+  '10 wrong passwords from 10 different addresses lock the username, even for the right password', `${tries.join(',')} then ${locked.status} ${locked.body.code}`)
+check(/Try again in 15 minutes, or ask a manager/.test(locked.body.message ?? ''), 'the message says how long, and what to do', locked.body.message)
+check((await attempt('hk.cara', PW3)).status === 200, 'other usernames are not affected')
+const ghostTries = []
+for (let i = 0; i < 10; i++) ghostTries.push((await attempt('ghost.user', WRONG)).status)
+const ghost = await attempt('ghost.user', WRONG)
+check(ghost.status === 429 && ghost.body.code === 'USERNAME_LOCKED' && ghostTries.every((c) => c === 401), 'a username that does not exist locks the same way (reveals nothing)')
+check((await attempt('FO-Ben', PW)).status === 429, 'upper case does not get round the lock')
+await resetStaffPassword(auth, ben, PW)
+check((await attempt(benUser, PW)).status === 200, 'a manager setting a new password clears the lock')
+await owner.query(`update auth.sign_in_failures set first_failed_at = now() - interval '2 days', locked_until = null where username = 'ghost.user'`)
+await attempt('rl.cleanup', WRONG)
+check((await owner.query(`select count(*)::int n from auth.sign_in_failures where username = 'ghost.user'`)).rows[0].n === 0, 'old entries are cleaned up')
+
+console.log('\nPhase 6  deactivated staff are refused at sign-in')
+await setStaffActive(auth, W, mgr.userId, cara, false)
+check((await owner.query(`select blocked from auth.users where id = $1`, [cara])).rows[0].blocked === true, 'deactivating marks the login as blocked')
+const sessionsBefore = (await owner.query(`select count(*)::int n from auth.session where user_id = $1`, [cara])).rows[0].n
+const refused = await attempt('hk.cara', PW3)
+check(refused.status === 403 && refused.body.code === 'ACCOUNT_DISABLED' && /not active/.test(refused.body.message), 'the right password gets "not active" (403)', JSON.stringify(refused))
+check((await owner.query(`select count(*)::int n from auth.session where user_id = $1`, [cara])).rows[0].n === sessionsBefore, 'and no session is created at all, not even briefly')
+check((await attempt('hk.cara', WRONG)).status === 401, 'a wrong password still just says "incorrect" (nothing revealed)')
+await setStaffActive(auth, W, mgr.userId, cara, true)
+check((await owner.query(`select blocked from auth.users where id = $1`, [cara])).rows[0].blocked === false && (await attempt('hk.cara', PW3)).status === 200, 'reactivating unblocks: signed in again')
 
 await appPool.end()
 for (const p of pools) await p.end()

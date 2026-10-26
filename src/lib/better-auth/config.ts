@@ -6,12 +6,17 @@
 //   * tables live in schema auth and are reached only through the auth_service pool;
 //   * sessions last 12 hours (refreshed hourly while in use); no cookie cache, so
 //     ending a session takes effect on the very next request;
-//   * sign-in attempts are rate limited and the counters are stored in Postgres;
+//   * sign-in attempts are rate limited per address (30 a minute: the hotel
+//     Wi-Fi is one address) with counters in Postgres, and wrong passwords
+//     are limited per username (10 in 15 minutes locks it for 15 minutes);
+//   * deactivated staff are refused a session (auth.users.blocked);
 //   * telemetry is off.
 import { betterAuth, type BetterAuthPlugin } from 'better-auth'
+import { APIError, createAuthMiddleware, isAPIError } from 'better-auth/api'
 import { username } from 'better-auth/plugins'
 import { randomUUID } from 'node:crypto'
 import { SESSION_HOURS, SIGN_IN_ATTEMPTS_PER_MINUTE, MIN_PASSWORD, MAX_PASSWORD, USERNAME_PATTERN } from './rules'
+import { guardKey, makeSignInGuard, type Query } from './sign-in-guard'
 
 export { USERNAME_PATTERN, MIN_PASSWORD, MAX_PASSWORD, SESSION_HOURS, SIGN_IN_ATTEMPTS_PER_MINUTE } from './rules'
 
@@ -36,6 +41,10 @@ const fields = (map: Record<string, string>) => map
 
 export function makeAuth(cfg: AuthConfig) {
   if (cfg.secret.length < 32) throw new Error('The Better Auth secret must be at least 32 characters.')
+  // The sign-in guard uses the same auth_service pool (fails closed without it).
+  const pool = cfg.database as { query?: Query }
+  if (typeof pool?.query !== 'function') throw new Error('makeAuth needs the auth_service pg Pool as database.')
+  const guard = makeSignInGuard(pool.query.bind(pool))
   const secure = cfg.secure ?? cfg.baseURL.startsWith('https://')
   return betterAuth({
     database: cfg.database,
@@ -92,6 +101,44 @@ export function makeAuth(cfg: AuthConfig) {
       useSecureCookies: secure,
       defaultCookieAttributes: { httpOnly: true, sameSite: 'lax', secure },
       ipAddress: { ipAddressHeaders: [cfg.ipHeader ?? 'x-real-ip'] },
+    },
+    // Phase 6 sign-in protection (src/lib/better-auth/sign-in-guard.ts).
+    hooks: {
+      before: createAuthMiddleware(async (ctx) => {
+        if (ctx.path !== '/sign-in/username') return
+        const key = guardKey((ctx.body as { username?: unknown } | undefined)?.username)
+        if (!key) return
+        const minutes = await guard.lockedMinutes(key)
+        if (minutes > 0) {
+          throw new APIError('TOO_MANY_REQUESTS', {
+            code: 'USERNAME_LOCKED',
+            message: `Too many wrong passwords for this username. Try again in ${minutes} minute${minutes === 1 ? '' : 's'}, or ask a manager to set a new password.`,
+          })
+        }
+      }),
+      after: createAuthMiddleware(async (ctx) => {
+        if (ctx.path !== '/sign-in/username') return
+        const key = guardKey((ctx.body as { username?: unknown } | undefined)?.username)
+        if (!key) return
+        const returned = ctx.context.returned
+        if (isAPIError(returned)) {
+          if (returned.statusCode === 401) await guard.recordFailure(key) // wrong username or password
+          return
+        }
+        await guard.clear(key) // correct password: start again from zero
+      }),
+    },
+    databaseHooks: {
+      session: {
+        create: {
+          // A deactivated staff member never gets a session, by any route.
+          before: async (session) => {
+            if (await guard.isBlocked(session.userId)) {
+              throw new APIError('FORBIDDEN', { code: 'ACCOUNT_DISABLED', message: 'This account is not active. Ask a manager.' })
+            }
+          },
+        },
+      },
     },
     plugins: [
       username({

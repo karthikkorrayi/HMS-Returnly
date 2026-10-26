@@ -4,6 +4,7 @@
 // These functions do NOT check who is calling: the caller (a manager-only
 // server action or the create-staff command) must do that first.
 import { MAX_PASSWORD, MIN_PASSWORD, USERNAME_PATTERN, type Auth } from './config'
+import { guardKey, makeSignInGuard, type Query } from './sign-in-guard'
 
 export class StaffLoginError extends Error {}
 
@@ -46,12 +47,17 @@ export async function createStaffLogin(auth: Auth, input: { username: string; pa
   return user.id
 }
 
-/** Sets a new password (stored as a scrypt hash) and ends every session of that user. */
+/** Sets a new password (stored as a scrypt hash), ends every session of that
+ *  user, and clears any wrong-password lock on their username. */
 export async function resetStaffPassword(auth: Auth, userId: string, password: string): Promise<void> {
   checkPassword(password)
   const ctx = await auth.$context
   await ctx.internalAdapter.updatePassword(userId, await ctx.password.hash(password))
   await ctx.internalAdapter.deleteUserSessions(userId)
+  const user = (await ctx.internalAdapter.findUserById(userId)) as { username?: string | null } | null
+  const key = guardKey(user?.username)
+  const pool = auth.options.database as { query?: Query }
+  if (key && typeof pool?.query === 'function') await makeSignInGuard(pool.query.bind(pool)).clear(key)
 }
 
 /** Ends every session of a user. Deactivation = set staff.active = false, then call this. */
