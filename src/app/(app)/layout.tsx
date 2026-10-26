@@ -27,6 +27,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <div className="mt-auto border-t border-line pt-4">
           <p className="font-semibold">{staff.display_name}</p>
           <p className="hint mt-1">{ROLE_LABEL[staff.role]}</p>
+          <Link href="/account" className="mt-2 block text-xs font-semibold text-teal">
+            Change password
+          </Link>
           <form action={signOut} className="mt-4">
             <button className="btn btn-secondary w-full">Sign out</button>
           </form>
@@ -40,10 +43,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-line bg-surface px-4 py-3 md:hidden">
           <div className="flex min-w-0 items-center gap-3">
             <span className="brand-mark"><ReturnlyIcon name="tag" /></span>
-            <div className="min-w-0">
+            <Link href="/account" className="min-w-0" aria-label="Your account and password">
               <p className="truncate font-bold leading-tight">{property.name}</p>
-              <p className="hint truncate">{staff.display_name} · {ROLE_LABEL[staff.role]}</p>
-            </div>
+              <p className="hint truncate">{staff.display_name} · {ROLE_LABEL[staff.role]} · <span className="text-teal">Account</span></p>
+            </Link>
           </div>
           <form action={signOut}>
             <button className="btn btn-secondary min-h-9 px-3 text-sm">Sign out</button>

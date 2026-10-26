@@ -1,6 +1,6 @@
 import 'server-only'
 import { cache } from 'react'
-import { headers } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getAuth } from '@/lib/better-auth/instance'
 import { withStaff } from '@/lib/db'
@@ -15,8 +15,14 @@ export { USERNAME_PATTERN } from '@/lib/better-auth/rules'
 // session takes effect on the very next request.
 // headers() comes first: it marks every page that checks the session as
 // rendered per request, so `next build` never tries to sign in.
+// The cookie header is rebuilt from cookies(), which (unlike headers()) also
+// sees a cookie a server action has just set: after a password change the
+// page re-renders with the NEW session, not the one that was just ended.
 export const currentLogin = cache(async (): Promise<{ userId: string } | null> => {
-  const requestHeaders = await headers()
+  const requestHeaders = new Headers(await headers())
+  const jar = (await cookies()).toString()
+  if (jar) requestHeaders.set('cookie', jar)
+  else requestHeaders.delete('cookie')
   const auth = await getAuth()
   const result = await auth.api.getSession({ headers: requestHeaders })
   return result ? { userId: result.user.id } : null
