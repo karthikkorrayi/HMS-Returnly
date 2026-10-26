@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { signInDestination } from '../src/lib/sign-in-destination.ts'
 
 test('quick actions preserve known staff entry points', () => {
-  for (const route of ['/items', '/items/new', '/staff']) {
+  for (const route of ['/items', '/items/new', '/staff', '/account']) {
     assert.equal(signInDestination(route), route)
   }
 })

@@ -7,6 +7,7 @@
 // S10 identical errors, S11 login cost, plus the cross-site check on POST.
 // Step A3: the session lookup pages use (loadStaffSession) and create-staff.
 // Step A4: managers add staff, set passwords and change access (staff-admin).
+// Phase 6: per-username lock, deactivated staff refused, own password change.
 // Secrets are random per run and never printed.
 import { openTestDb } from './test-db.mjs'
 import { readFileSync } from 'node:fs'
@@ -22,6 +23,7 @@ import { loadStaffSession } from '../../src/lib/staff-session.ts'
 import { addStaffMember } from '../../src/lib/better-auth/add-staff.ts'
 import { StaffLoginError } from '../../src/lib/better-auth/staff-logins.ts'
 import { addStaff, setStaffPassword, setStaffActive, StaffAdminError } from '../../src/lib/staff-admin.ts'
+import { changeOwnPassword, OwnPasswordError } from '../../src/lib/better-auth/own-password.ts'
 
 const ROOT = new URL('../..', import.meta.url).pathname.replace(/\/$/, '')
 const { db, kind, connectAs, urlFor, close } = await openTestDb('auth')
@@ -299,6 +301,43 @@ check((await owner.query(`select count(*)::int n from auth.session where user_id
 check((await attempt('hk.cara', WRONG)).status === 401, 'a wrong password still just says "incorrect" (nothing revealed)')
 await setStaffActive(auth, W, mgr.userId, cara, true)
 check((await owner.query(`select blocked from auth.users where id = $1`, [cara])).rows[0].blocked === false && (await attempt('hk.cara', PW3)).status === 200, 'reactivating unblocks: signed in again')
+
+console.log('\nPhase 6  staff change their own password')
+const DPW = randomBytes(18).toString('base64url')
+const DPW2 = randomBytes(18).toString('base64url')
+const dana = await createStaffLogin(auth, { username: 'fo.dana', password: DPW, name: 'Dana (test)' })
+await staffRow(dana, 'fo.dana', 'front_office')
+const danaIn = async (password) => { const r = await call('/sign-in/username', { body: { username: 'fo.dana', password }, ip: ip() }); return { status: r.status, cookie: cookieOf(r) } }
+const phone = (await danaIn(DPW)).cookie
+const laptop = (await danaIn(DPW)).cookie
+const own = async (cookie, input) => {
+  try { return { headers: await changeOwnPassword(auth, new Headers({ cookie, origin: BASE }), input) } }
+  catch (e) { return { error: e instanceof OwnPasswordError ? e.message : 'unexpected: ' + e.message } }
+}
+check((await own(phone, { current: WRONG, next: DPW2, confirm: DPW2 })).error === 'Your current password is not correct.', 'a wrong current password is refused')
+check((await own(phone, { current: DPW, next: DPW2, confirm: DPW2 + 'x' })).error === 'The two new passwords do not match.', 'the two new passwords must match')
+check(/must be 10–128 characters/.test((await own(phone, { current: DPW, next: 'short', confirm: 'short' })).error ?? ''), 'a too-short new password is refused')
+check(/different/.test((await own(phone, { current: DPW, next: DPW, confirm: DPW })).error ?? ''), 'the new password must differ from the current one')
+check((await own('', { current: DPW, next: DPW2, confirm: DPW2 })).error === 'Your session has ended. Sign in again.', 'without a session nothing changes')
+check((await danaIn(DPW)).status === 200, '(after all those refusals the old password still works)')
+const changed = await own(phone, { current: DPW, next: DPW2, confirm: DPW2 })
+check(!changed.error, 'the right current password changes it', changed.error)
+const newPhone = cookieOf({ headers: changed.headers })
+check((await session(newPhone))?.user?.id === dana, 'this device stays signed in (fresh session cookie)')
+check((await session(laptop)) === null && (await session(phone)) === null, 'every other session is signed out')
+check((await danaIn(DPW)).status === 401, 'the old password no longer works')
+check((await danaIn(DPW2)).status === 200, 'the new password works')
+const dHash = (await owner.query(`select password from auth.account where user_id = $1`, [dana])).rows[0].password
+check(dHash && dHash !== DPW2 && dHash.length > 40, 'the new password is stored as a hash')
+// Guessing the current password counts towards the same lock as sign-in.
+const guess = []
+for (let i = 0; i < 10; i++) guess.push((await own(newPhone, { current: WRONG, next: DPW, confirm: DPW })).error)
+check(guess.slice(0, 9).every((m) => m === 'Your current password is not correct.') && /locked for 15 minutes/.test(guess[9]),
+  '10 wrong current passwords lock the username', guess[9])
+check(/Too many wrong passwords/.test((await own(newPhone, { current: DPW2, next: DPW, confirm: DPW })).error ?? ''), 'while locked, even the right current password is refused')
+check((await call('/sign-in/username', { body: { username: 'fo.dana', password: DPW2 }, ip: ip() })).status === 429, 'and sign-in is locked too')
+await resetStaffPassword(auth, dana, DPW)
+check((await danaIn(DPW)).status === 200, 'a manager reset clears it')
 
 await appPool.end()
 for (const p of pools) await p.end()
