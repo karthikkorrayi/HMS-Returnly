@@ -4,4 +4,7 @@ export const USERNAME_PATTERN = /^[a-z0-9._-]{3,32}$/
 export const MIN_PASSWORD = 10
 export const MAX_PASSWORD = 128
 export const SESSION_HOURS = 12
-export const SIGN_IN_ATTEMPTS_PER_MINUTE = 5
+// Per internet address. Every phone on the hotel Wi-Fi shares one address, so
+// this allows a busy shift change; guessing is limited per username instead
+// (src/lib/better-auth/sign-in-guard.ts).
+export const SIGN_IN_ATTEMPTS_PER_MINUTE = 30

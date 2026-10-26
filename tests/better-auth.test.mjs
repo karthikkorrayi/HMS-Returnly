@@ -7,6 +7,7 @@ import { fromOurSite } from '../src/lib/better-auth/origin.ts'
 import { makeAuth, SESSION_HOURS, MIN_PASSWORD, SIGN_IN_ATTEMPTS_PER_MINUTE } from '../src/lib/better-auth/config.ts'
 import { normaliseUsername, checkPassword, StaffLoginError } from '../src/lib/better-auth/staff-logins.ts'
 import { randomBytes } from 'node:crypto'
+import pg from 'pg'
 
 const BASE = 'https://returnly.example'
 const req = (headers) => new Request(BASE + '/api/auth/sign-in/username', { method: 'POST', headers })
@@ -39,9 +40,12 @@ test('usernames and passwords follow the app rules', () => {
 test('configuration matches the spike report conditions', () => {
   assert.equal(SESSION_HOURS, 12)
   assert.equal(MIN_PASSWORD, 10)
-  assert.equal(SIGN_IN_ATTEMPTS_PER_MINUTE, 5)
-  assert.throws(() => makeAuth({ database: undefined, baseURL: BASE, secret: 'too-short' }), /at least 32/)
-  const auth = makeAuth({ database: undefined, baseURL: BASE, secret: randomBytes(24).toString('base64url') })
+  assert.equal(SIGN_IN_ATTEMPTS_PER_MINUTE, 30, 'per address: a whole shift on one hotel Wi-Fi; guessing is limited per username')
+  // A real pg Pool that is never used (it only connects on the first query).
+  const fakePool = new pg.Pool({ connectionString: 'postgresql://nobody@127.0.0.1:1/none', max: 1 })
+  assert.throws(() => makeAuth({ database: fakePool, baseURL: BASE, secret: 'too-short' }), /at least 32/)
+  assert.throws(() => makeAuth({ database: undefined, baseURL: BASE, secret: randomBytes(24).toString('base64url') }), /needs the auth_service pg Pool/)
+  const auth = makeAuth({ database: fakePool, baseURL: BASE, secret: randomBytes(24).toString('base64url') })
   const o = auth.options
   assert.equal(o.emailAndPassword.disableSignUp, true, 'public sign-up disabled')
   assert.equal(o.session.cookieCache.enabled, false, 'no cookie cache: revocation is immediate')

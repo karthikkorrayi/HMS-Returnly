@@ -9,6 +9,7 @@ instead of Supabase. Supabase production is unchanged until launch.
 | `migrations/*.sql` | The eight Supabase migrations, copied. `004` is empty and `008` lacks one block: both only configured Supabase Storage, whose photo rules move to the app in Phase 5 | `app_owner` | in filename order, after the bootstrap; `007` alone in its own transaction |
 | `migrations/20261022000009_auth_tables.sql` | **Railway only.** Sign-in tables for Better Auth in schema `auth` (extends `auth.users`; adds `session`, `account`, `verification`, `rate_limit`), usable only by `auth_service` | `app_owner` | after re-running the bootstrap (it creates `auth_service`) |
 | `migrations/20261024000010_staff_admin.sql` | **Railway only.** `add_staff_member()` and `set_staff_active()`: the only way the app can add a staff row or change access; each checks the caller is an active manager of the same hotel | `app_owner` | after 009 |
+| `migrations/20261026000011_sign_in_guard.sql` | **Railway only.** `auth.sign_in_failures` (wrong-password lock per username) and `auth.users.blocked` (deactivated staff cannot sign in), kept in step by `set_staff_active()` | `app_owner` | after 010 |
 | `migrate.mjs` | The runner: applies `migrations/` in order, one transaction per file, recording each file's SHA-256 in `ops.schema_migrations` | `app_owner` via `MIGRATION_DATABASE_URL` | every deploy (Phase 7 pre-deploy step) |
 
 While `supabase/migrations/` still exists (until launch), change both folders together:
