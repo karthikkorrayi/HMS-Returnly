@@ -335,7 +335,7 @@ for (let i = 0; i < 10; i++) guess.push((await own(newPhone, { current: WRONG, n
 check(guess.slice(0, 9).every((m) => m === 'Your current password is not correct.') && /locked for 15 minutes/.test(guess[9]),
   '10 wrong current passwords lock the username', guess[9])
 check(/Too many wrong passwords/.test((await own(newPhone, { current: DPW2, next: DPW, confirm: DPW })).error ?? ''), 'while locked, even the right current password is refused')
-check((await call('/sign-in/username', { body: { username: 'fo.dana', password: DPW2 }, ip: ip() })).status === 429, 'and sign-in is locked too')
+check((await danaIn(DPW2)).status === 429, 'and sign-in is locked too')
 await resetStaffPassword(auth, dana, DPW)
 check((await danaIn(DPW)).status === 200, 'a manager reset clears it')
 
