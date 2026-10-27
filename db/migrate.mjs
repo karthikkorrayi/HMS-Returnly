@@ -147,11 +147,28 @@ async function main(argv) {
     console.error('MIGRATION_DATABASE_URL is not set (it must log in as app_owner).')
     return 2
   }
-  const u = new URL(url)
+  // Never echo the URL itself: it contains the password. (Node's own "Invalid
+  // URL" error prints the whole input, so it must not reach the log.)
+  let u
+  try {
+    u = new URL(url)
+  } catch {
+    console.error('MIGRATION_DATABASE_URL is not a valid postgresql:// URL (value not shown). On Railway: check its ${{...}} references.')
+    return 2
+  }
+  if (!/^postgres(ql)?:$/.test(u.protocol) || !u.hostname) {
+    console.error('MIGRATION_DATABASE_URL has no host name or is not postgresql:// (value not shown). On Railway: a ${{Service.VARIABLE}} reference is probably empty (service name?).')
+    return 2
+  }
   console.log(`database ${u.hostname}${u.port ? ':' + u.port : ''}${u.pathname} as ${decodeURIComponent(u.username) || '(default user)'}`)
   const { default: pg } = await import('pg')
   const client = new pg.Client({ connectionString: url, application_name: 'returnly-migrate' })
-  await client.connect()
+  try {
+    await client.connect()
+  } catch (e) {
+    console.error(`✗ could not connect to the database (${e.code || 'error'}): ${String(e.message).split('\n')[0].replaceAll(url, '[url]')}`)
+    return 1
+  }
   try {
     await migrate({ query: (s, p) => client.query(s, p), exec: (s) => client.query(s) }, {
       apply: argv.includes('--apply'),
