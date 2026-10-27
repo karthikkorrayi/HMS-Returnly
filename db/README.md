@@ -1,6 +1,6 @@
 # Database for plain Postgres (Railway)
 
-This folder holds the database setup for running HMS Returnly on plain Postgres 17+
+This folder holds the database setup for running HMS Returnly on plain Postgres 17+ (Railway runs 18; CI tests on 18)
 instead of Supabase. Supabase production is unchanged until launch.
 
 | Path | What | Run as | When |

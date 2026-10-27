@@ -10,10 +10,11 @@ jobs:
   check:
     runs-on: ubuntu-latest
     services:
-      # Throwaway Postgres 17 that exists only for this CI run. Trust auth on a
-      # private CI network means no password to manage.
+      # Throwaway Postgres 18 (the major Railway runs) that exists only for
+      # this CI run. Trust auth on a private CI network means no password to
+      # manage.
       postgres:
-        image: postgres:17
+        image: postgres:18
         env:
           POSTGRES_HOST_AUTH_METHOD: trust
         ports:
@@ -64,7 +65,7 @@ jobs:
           ROOT_ACCESS_KEY="$key" ROOT_SECRET_KEY="$secret" nohup "$bin" posix /tmp/vgw-data > /tmp/vgw.log 2>&1 &
           for i in $(seq 1 30); do curl -s -o /dev/null http://127.0.0.1:7070/ && break; sleep 1; done
           curl -s -o /dev/null -w "versitygw answered HTTP %{http_code}\n" http://127.0.0.1:7070/
-      - name: Database rules on real Postgres 17 (+ photos on versitygw)
+      - name: Database rules on real Postgres 18 (+ photos on versitygw)
         env:
           TEST_DATABASE_URL: postgresql://postgres@localhost:5432/postgres
           S3_TEST_ENDPOINT: http://127.0.0.1:7070

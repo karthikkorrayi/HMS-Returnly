@@ -41,22 +41,43 @@ release gates in `docs/MIGRATION_PLAN.md`.
 
 ### Postgres
 
-- Source image pinned to a **PostgreSQL 17** image (Railway's default is 16).
-  Must be set **before** any data exists: changing it later means wiping the
-  volume. Record `select version()` here: `…`
+- **PostgreSQL 18** (Railway's default for new databases in October 2026).
+  Staging: `PostgreSQL 18.6 (Debian 18.6-1.pgdg13+2)`, recorded 2026-10-27.
+  CI tests on `postgres:18` so it matches. Local development may stay on 17
+  (the whole suite passes on both). Never `:latest`; a later major goes through
+  Railway's Database → Config → Major Version Upgrade.
+- Application database: **`returnly`** (Railway's own `railway` database is
+  left unused).
 - Volume at `/var/lib/postgresql/data`, EU West.
 - **No public TCP proxy** (only the private network reaches it). If one is
   ever enabled for a one-off task, remove it straight after.
-- Backups (Phase 6/7): Railway volume backups daily + weekly, **and** an
+- Backups (Phase 6/7): Railway volume backups daily + weekly (needs the Hobby
+  plan; **not on yet**, staging runs on trial credits), **and** an
   encrypted off-platform `pg_dump` (Railway backups can only be restored inside
   the same project and environment).
-- One-time setup as the `postgres` superuser: `db/bootstrap/000_platform.sql`,
-  then passwords for `app_owner`, `app_user`, `auth_service` (generated on the
-  owner's computer, never in chat or in the repository).
+- One-time setup as the `postgres` superuser, done for staging on 2026-10-27
+  with the owner's `railway-db-setup.bash`: database `returnly`,
+  `db/bootstrap/000_platform.sql`, and random passwords for `app_owner`,
+  `app_user`, `auth_service` (generated on the owner's computer; only SCRAM
+  verifiers sent; public networking switched on for the run and off after).
+
+### Shared variables (per environment)
+
+Set once in the environment's Shared Variables; services refer to them as
+`${{shared.NAME}}`. Values are never written anywhere else.
+
+| Name | What |
+|---|---|
+| `APP_OWNER_PASSWORD` | `app_owner` login (migrations) |
+| `APP_USER_PASSWORD` | `app_user` login (the web app) |
+| `AUTH_SERVICE_PASSWORD` | `auth_service` login (sign-in) |
+| `BETTER_AUTH_SECRET` | signs sessions; different per environment |
 
 ### Bucket (photos)
 
-- Railway Storage Bucket, EU West, private (Railway buckets cannot be public).
+- Railway Storage Bucket named **`photos`**, EU West, private (Railway buckets
+  cannot be public). Endpoint `https://t3.storageapi.dev`, virtual-hosted
+  addresses (new buckets' default) → `S3_PATH_STYLE=false`.
 - No versioning or backups on Railway's side, and a deleted bucket is
   recoverable for only 52 hours: the daily off-platform photo copy (Phase 6)
   is required before real data.
@@ -77,30 +98,38 @@ release gates in `docs/MIGRATION_PLAN.md`.
 | Restart policy | on failure |
 | Public domain | Railway-provided `*.up.railway.app` (custom domain in Phase 8) |
 
-Variables on **web** (names only; values in Railway):
+Variables on **web** (Raw Editor). These are references, not secrets: the
+values are filled in by Railway from the shared variables and the other
+services.
 
-| Name | Value / source |
-|---|---|
-| `DATABASE_URL` | `postgresql://app_user:<password>@${{Postgres.RAILWAY_PRIVATE_DOMAIN}}:5432/<db>` |
-| `MIGRATION_DATABASE_URL` | same, as `app_owner` (used only by the pre-deploy command) |
-| `AUTH_DATABASE_URL` | same, as `auth_service` |
-| `BETTER_AUTH_URL` | `https://<this environment's public domain>` |
-| `BETTER_AUTH_SECRET` | 32+ random bytes, **different per environment** |
-| `AUTH_IP_HEADER` | `x-real-ip` (Railway's edge overwrites it; verify on staging) |
-| `STAFF_EMAIL_DOMAIN` | `staff.invalid` |
-| `S3_ENDPOINT` | `${{Bucket.ENDPOINT}}` |
-| `S3_BUCKET` | `${{Bucket.BUCKET}}` (not `RAILWAY_BUCKET_NAME`) |
-| `S3_ACCESS_KEY_ID` | `${{Bucket.ACCESS_KEY_ID}}` |
-| `S3_SECRET_ACCESS_KEY` | `${{Bucket.SECRET_ACCESS_KEY}}` |
-| `S3_REGION` | `${{Bucket.REGION}}` |
-| `S3_PATH_STYLE` | `false` unless the bucket's Credentials tab says path-style |
+```
+DATABASE_URL=postgresql://app_user:${{shared.APP_USER_PASSWORD}}@${{Postgres.RAILWAY_PRIVATE_DOMAIN}}:5432/returnly
+MIGRATION_DATABASE_URL=postgresql://app_owner:${{shared.APP_OWNER_PASSWORD}}@${{Postgres.RAILWAY_PRIVATE_DOMAIN}}:5432/returnly
+AUTH_DATABASE_URL=postgresql://auth_service:${{shared.AUTH_SERVICE_PASSWORD}}@${{Postgres.RAILWAY_PRIVATE_DOMAIN}}:5432/returnly
+BETTER_AUTH_URL=https://${{RAILWAY_PUBLIC_DOMAIN}}
+BETTER_AUTH_SECRET=${{shared.BETTER_AUTH_SECRET}}
+AUTH_IP_HEADER=x-real-ip
+STAFF_EMAIL_DOMAIN=staff.invalid
+S3_ENDPOINT=${{photos.ENDPOINT}}
+S3_BUCKET=${{photos.BUCKET}}
+S3_ACCESS_KEY_ID=${{photos.ACCESS_KEY_ID}}
+S3_SECRET_ACCESS_KEY=${{photos.SECRET_ACCESS_KEY}}
+S3_REGION=${{photos.REGION}}
+S3_PATH_STYLE=false
+```
+
+- `BETTER_AUTH_URL` must be the exact public address people use, or sign-in
+  is refused as cross-site (403). Change it when a custom domain is added.
+- `S3_BUCKET` uses the bucket's `BUCKET` variable, not `RAILWAY_BUCKET_NAME`.
+- `AUTH_IP_HEADER`: Railway's edge overwrites `X-Real-IP`, so visitors can't
+  fake it (Railway staff, 2026). Still checked on staging.
 
 `MIGRATION_DATABASE_URL` sits on the web service because Railway's pre-deploy
 command only sees that service's variables. The app itself never reads it
 (only `db/migrate.mjs` does). Known trade-off; revisit if a separate migration
 job becomes possible.
 
-(`Postgres` and `Bucket` are the service names on the canvas; adjust the
+(`Postgres` and `photos` are the service names on the canvas; adjust the
 references if they are named differently.)
 
 ## Rolling back
