@@ -3,8 +3,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
+import { randomBytes } from 'node:crypto'
 
-const SECRET = 'wIFk1E1yjSecretPw-xyz'
+// A fresh random stand-in password per run: no fixed value in the code.
+const SECRET = randomBytes(18).toString('base64url')
 const run = (url) => {
   const r = spawnSync(process.execPath, ['db/migrate.mjs'], { env: { ...process.env, MIGRATION_DATABASE_URL: url }, encoding: 'utf8', timeout: 20000 })
   return { code: r.status, out: r.stdout + r.stderr }
