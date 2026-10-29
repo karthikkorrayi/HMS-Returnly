@@ -28,7 +28,7 @@ const MARKER = '-- [Railway] Supabase Storage policy item_photos_upload removed 
 const NOTE_END = '-- (end of Railway note)\n'
 // Migrations that exist only for Railway (Supabase has its own Auth until
 // launch). Each must be listed here explicitly and sort after every shared file.
-const RAILWAY_ONLY = new Set(['20261022000009_auth_tables.sql', '20261024000010_staff_admin.sql', '20261026000011_sign_in_guard.sql'])
+const RAILWAY_ONLY = new Set(['20261022000009_auth_tables.sql', '20261024000010_staff_admin.sql', '20261026000011_sign_in_guard.sql', '20261030000012_hotel_setup.sql'])
 
 test('both folders hold the same migration file names, apart from listed Railway-only files', () => {
   const rail = readdirSync(RAIL).sort()
