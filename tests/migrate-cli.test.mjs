@@ -31,3 +31,9 @@ test('host that does not exist: fails with the error code, no password', () => {
   assert.match(r.out, /could not connect/)
   assert.ok(!r.out.includes(SECRET), r.out)
 })
+
+test('empty host says so plainly', () => {
+  const r = run(`postgresql://app_owner:${SECRET}@:5432/returnly`)
+  assert.match(r.out, /EMPTY host name/)
+  assert.ok(!r.out.includes(SECRET), r.out)
+})

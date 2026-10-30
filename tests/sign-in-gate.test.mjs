@@ -8,13 +8,13 @@ import { USERNAME_PATTERN, MIN_PASSWORD } from '../src/lib/better-auth/rules.ts'
 import * as config from '../src/lib/better-auth/config.ts'
 
 test('public pages and API routes need no sign-in', () => {
-  for (const p of ['/', '/login', '/track', '/track/ABC123', '/api/auth/get-session', '/api']) {
+  for (const p of ['/', '/login', '/track', '/track/ABC123', '/setup', '/api/auth/get-session', '/api']) {
     assert.equal(needsSignIn(p), false, p)
   }
 })
 
 test('staff pages need sign-in, including look-alike paths', () => {
-  for (const p of ['/items', '/items/new', '/staff', '/requests/1', '/support', '/settings', '/loginx', '/tracking', '/apis']) {
+  for (const p of ['/items', '/items/new', '/staff', '/requests/1', '/support', '/settings', '/loginx', '/tracking', '/apis', '/setupx']) {
     assert.equal(needsSignIn(p), true, p)
   }
 })

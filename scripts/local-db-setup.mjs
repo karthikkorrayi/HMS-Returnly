@@ -10,8 +10,10 @@
 // database it re-applies the (idempotent) bootstrap, applies only migrations
 // that are not applied yet, and re-runs the seed (which skips existing rows).
 //
-// Connects with LOCAL_PG_URL (default postgresql://localhost:5432/postgres,
-// as your own user — Postgres.app makes that a superuser). Refuses anything
+// Connects with LOCAL_PG_URL. Without it: the host and port of DATABASE_URL in
+// .env.local (e.g. 5433 when another PostgreSQL already uses 5432), otherwise
+// postgresql://localhost:5432/postgres — as your own user (Postgres.app makes
+// that a superuser). Refuses anything
 // that is not on this computer, so it can never touch a real database.
 import { readFileSync } from 'node:fs'
 import { parseArgs } from 'node:util'
@@ -48,7 +50,7 @@ export async function setupLocalDb({ adminUrl, database, log = console.log }) {
     const me = (await admin.query(`select current_user as u, r.rolsuper as su, current_setting('server_version_num')::int as v
       from pg_roles r where r.rolname = current_user`)).rows[0]
     if (!me.su) throw new SetupError(`"${me.u}" is not a superuser; the bootstrap needs one (Postgres.app's default user is).`)
-    if (me.v < 170000) throw new SetupError('PostgreSQL 17 or newer is needed (Railway runs 17).')
+    if (me.v < 170000) throw new SetupError(`PostgreSQL 17 or newer is needed (Railway runs 18); port ${base.port || 5432} has an older server. Is another PostgreSQL (e.g. Homebrew) on that port? Set LOCAL_PG_URL=postgresql://localhost:<port>/postgres`)
     const exists = (await admin.query(`select 1 from pg_database where datname = $1`, [database])).rows.length > 0
     if (!exists) {
       await admin.query(`create database "${database}"`) // name checked against the pattern above
@@ -97,6 +99,20 @@ export async function setupLocalDb({ adminUrl, database, log = console.log }) {
   }
 }
 
+// The server to set up: LOCAL_PG_URL, else the host/port .env.local already uses.
+export function defaultAdminUrl(envLocalText) {
+  const line = (envLocalText ?? '').split('\n').find((l) => /^DATABASE_URL=/.test(l.trim()))
+  if (line) {
+    try {
+      const u = new URL(line.trim().slice('DATABASE_URL='.length).replace(/^["']|["']$/g, ''))
+      if (LOCAL_HOSTS.has(u.hostname)) return `postgresql://${u.hostname}:${u.port || 5432}/postgres`
+    } catch {
+      // not a URL: fall back to the default
+    }
+  }
+  return 'postgresql://localhost:5432/postgres'
+}
+
 async function main(argv) {
   let values
   try {
@@ -106,8 +122,13 @@ async function main(argv) {
     return 1
   }
   try {
+    let envLocal = ''
+    try { envLocal = readFileSync(`${ROOT}.env.local`, 'utf8') } catch { /* no .env.local yet */ }
+    const adminUrl = process.env.LOCAL_PG_URL || defaultAdminUrl(envLocal)
+    const shown = new URL(adminUrl)
+    console.log(`• server: ${shown.hostname}:${shown.port || 5432}${process.env.LOCAL_PG_URL ? ' (LOCAL_PG_URL)' : ''}`)
     const { urls } = await setupLocalDb({
-      adminUrl: process.env.LOCAL_PG_URL || 'postgresql://localhost:5432/postgres',
+      adminUrl,
       database: values.database,
     })
     console.log('\nConnection strings for .env.local (local only, no passwords):')
