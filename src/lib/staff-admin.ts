@@ -1,5 +1,6 @@
 // What a manager can do to staff logins (step A4): add someone, set a new
-// password, deactivate or reactivate. Used by src/app/(app)/staff/actions.ts.
+// password, deactivate or reactivate, and (S5) change a name or role.
+// Used by src/app/(app)/staff/actions.ts.
 // No Next.js imports, so tests can run it against a real database.
 //
 // Two gates, both enforced:
@@ -35,7 +36,7 @@ function checkPassword(password: string) {
 }
 
 function dbError(e: unknown): never {
-  if (code(e) === '42501' || code(e) === 'P0002') throw new StaffAdminError((e as Error).message)
+  if (['42501', 'P0001', 'P0002'].includes(code(e) ?? '')) throw new StaffAdminError((e as Error).message)
   throw e
 }
 
@@ -107,4 +108,27 @@ export async function setStaffActive(auth: Auth, withStaff: WithStaff, managerId
     dbError(e)
   }
   if (!active) await endStaffSessions(auth, userId)
+}
+
+/** Renames someone or changes their role (e.g. makes them a manager). The
+ *  database refuses a manager changing their own role and keeps at least one
+ *  active manager (update_staff_member, migration 012). A new role applies on
+ *  the person's next page load: roles are read from the database each time. */
+export async function updateStaff(
+  withStaff: WithStaff,
+  managerId: string,
+  userId: string,
+  input: { displayName: string; role: string }
+): Promise<void> {
+  if (!UUID.test(userId)) throw new StaffAdminError('Staff member not found.')
+  const name = input.displayName.trim()
+  if (name.length < 1 || name.length > 80) throw new StaffAdminError('Enter the person’s name as colleagues know it (up to 80 characters).')
+  if (!(STAFF_ROLES as string[]).includes(input.role)) throw new StaffAdminError('Choose a role.')
+  try {
+    await withStaff(managerId, (tx) =>
+      tx.query(`select public.update_staff_member($1::uuid, $2, $3::public.staff_role)`, [userId, name, input.role])
+    )
+  } catch (e) {
+    dbError(e)
+  }
 }
