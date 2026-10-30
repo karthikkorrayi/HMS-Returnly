@@ -215,17 +215,7 @@ export const CATEGORIES: { value: string; label: string }[] = [
 
 export const CATEGORY_LABEL = Object.fromEntries(CATEGORIES.map((c) => [c.value, c.label]))
 
-export const PUBLIC_AREAS = [
-  'Lobby',
-  'Restaurant',
-  'Bar',
-  'Gym',
-  'Pool',
-  'Meeting rooms',
-  'Car park',
-  'Lifts',
-  'Corridor',
-]
+// Public areas are per hotel now (table public.areas, Settings → Areas).
 
 export type ActionState = { error: string | null; ok?: boolean }
 export const initialActionState: ActionState = { error: null }

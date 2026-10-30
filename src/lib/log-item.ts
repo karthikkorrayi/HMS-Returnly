@@ -44,6 +44,12 @@ export async function logItem(tx: Tx, userId: string, propertyId: string, input:
   const foundAt = new Date(input.foundAt)
   if (Number.isNaN(foundAt.getTime())) throw new LogItemError('Enter when it was found.')
   if (input.roomCheckId !== null && !UUID.test(input.roomCheckId)) throw new LogItemError('Unknown room check.')
+  // A retired room (Settings → Floors and rooms) is no longer offered; refuse it
+  // here too, so the rule doesn't depend on the form.
+  if (room && input.roomNumber?.trim()) {
+    const found = (await tx.query<{ active: boolean }>(`select active from public.rooms where room_number = $1`, [input.roomNumber.trim()])).rows[0]
+    if (found && !found.active) throw new LogItemError('That room has been retired. Ask a manager if it should be back in use.')
+  }
 
   try {
     const r = await tx.query<{ id: string }>(

@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { connection } from 'next/server'
 import { withAnon } from '@/lib/db'
 import { isSetUp } from '@/lib/setup'
+import { publicContacts, type PublicContact } from '@/lib/hotel-config'
 import ReturnlyIcon from '@/components/ReturnlyIcon'
 import EnquiryChat from '@/components/enquiry/EnquiryChat'
 import { listHotels } from '@/lib/requests/public-actions'
@@ -36,6 +37,14 @@ export default async function Home() {
   // be asked, the page shows as before: "Enquiries aren't available".)
   if ((await isSetUp(withAnon).catch(() => true)) === false) redirect('/setup')
   const hotels = await listHotels()
+  // The hotel's phone, email and hours for guests (entered at setup, edited
+  // under Settings). Never blocks the page if it can't be read.
+  const contacts: PublicContact[] = await withAnon(publicContacts).catch((e) => {
+    console.error('public contacts failed', e)
+    return []
+  })
+  const names = new Map(hotels.map((h) => [h.inn_code, h.name]))
+  const shown = contacts.filter((c) => c.contact_phone || c.contact_email || c.support_hours || c.support_note)
   const today = hotelToday()
 
   return (
@@ -96,6 +105,24 @@ export default async function Home() {
               </div>
             ) : (
               <EnquiryChat hotels={hotels} today={today} />
+            )}
+            {shown.length > 0 && (
+              <div className="panel mt-4 space-y-3 p-5">
+                <h3 className="font-semibold">Prefer to talk to someone?</h3>
+                {shown.map((c) => (
+                  <div key={c.inn_code} className="text-sm">
+                    {shown.length > 1 && <p className="font-semibold">{names.get(c.inn_code) ?? c.inn_code}</p>}
+                    {c.contact_phone && (
+                      <p>Phone: <a className="font-semibold text-teal underline" href={`tel:${c.contact_phone.replace(/[^0-9+]/g, '')}`}>{c.contact_phone}</a></p>
+                    )}
+                    {c.contact_email && (
+                      <p>Email: <a className="font-semibold text-teal underline" href={`mailto:${c.contact_email}`}>{c.contact_email}</a></p>
+                    )}
+                    {c.support_hours && <p className="text-muted">Hours: {c.support_hours}</p>}
+                    {c.support_note && <p className="text-muted">{c.support_note}</p>}
+                  </div>
+                ))}
+              </div>
             )}
           </section>
 

@@ -1,7 +1,9 @@
 // The customer-facing database calls (no sign-in), separated from the server
 // actions so tests can run them. Each runs inside withAnon(): role anon,
-// which may call exactly four functions (public_properties,
-// submit_customer_request, customer_request_status, customer_reply). Those
+// which may call these four functions (public_properties,
+// submit_customer_request, customer_request_status, customer_reply), plus the
+// hotel's contact details (public_hotel_contacts, src/lib/hotel-config.ts)
+// and the setup status (src/lib/setup.ts). Those
 // functions validate input, rate-limit, and return only what the customer may
 // see; staff data, item records and matches are never returned here.
 import type { Tx } from '@/lib/db/core'
