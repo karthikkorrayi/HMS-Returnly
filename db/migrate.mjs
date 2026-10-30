@@ -153,7 +153,13 @@ async function main(argv) {
   try {
     u = new URL(url)
   } catch {
-    console.error('MIGRATION_DATABASE_URL is not a valid postgresql:// URL (value not shown). On Railway: check its ${{...}} references.')
+    // The usual cause on Railway: a ${{Service.RAILWAY_PRIVATE_DOMAIN}} reference
+    // that resolved to nothing, leaving "…@:5432/…" (no host).
+    if (/@:\d|@\//.test(url)) {
+      console.error('MIGRATION_DATABASE_URL has an EMPTY host name (value not shown). On Railway: the ${{Service.RAILWAY_PRIVATE_DOMAIN}} reference resolved to nothing — check the service name (case-sensitive) and that the database has private networking on.')
+    } else {
+      console.error('MIGRATION_DATABASE_URL is not a valid postgresql:// URL (value not shown). On Railway: check its ${{...}} references, and that there are no quotes or spaces.')
+    }
     return 2
   }
   if (!/^postgres(ql)?:$/.test(u.protocol) || !u.hostname) {
@@ -161,6 +167,9 @@ async function main(argv) {
     return 2
   }
   console.log(`database ${u.hostname}${u.port ? ':' + u.port : ''}${u.pathname} as ${decodeURIComponent(u.username) || '(default user)'}`)
+  if (process.env.RAILWAY_ENVIRONMENT && u.hostname.endsWith('.railway.internal') && u.port && u.port !== '5432') {
+    console.error(`  ! port ${u.port}: Railway's private database address uses 5432 (5433 is only the port on a local computer).`)
+  }
   const { default: pg } = await import('pg')
   const client = new pg.Client({ connectionString: url, application_name: 'returnly-migrate' })
   try {

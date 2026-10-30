@@ -42,3 +42,6 @@ next-env.d.ts
 
 # example env file is committed
 !.env.example
+
+# delivery scripts from Claude: keep them outside the repository
+/*.bash

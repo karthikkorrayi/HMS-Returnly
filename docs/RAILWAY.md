@@ -118,6 +118,10 @@ S3_REGION=${{photos.REGION}}
 S3_PATH_STYLE=false
 ```
 
+- Each database line has **its own user** (`app_user` / `app_owner` /
+  `auth_service`), the host `postgres.railway.internal` and port **5432**.
+  5433 is only the port on the owner's Mac (two local PostgreSQL servers);
+  it never belongs in Railway.
 - `BETTER_AUTH_URL` must be the exact public address people use, or sign-in
   is refused as cross-site (403). Change it when a custom domain is added.
 - `S3_BUCKET` uses the bucket's `BUCKET` variable, not `RAILWAY_BUCKET_NAME`.
@@ -131,6 +135,28 @@ job becomes possible.
 
 (`Postgres` and `photos` are the service names on the canvas; adjust the
 references if they are named differently.)
+
+## First-time setup (once per environment)
+
+Each environment has its own database, so each is set up exactly once: staging
+with a made-up hotel, production with the real one at launch. Deploys never
+repeat it: the database records that setup is done (`installation`) and
+`complete_initial_setup()` refuses a second run.
+
+1. Generate a setup key on your computer: `openssl rand -hex 24`.
+2. Add it to the **web** service of that environment as `SETUP_TOKEN` and
+   deploy. (Without it, or if it is shorter than 24 characters, `/setup` says
+   "Setup is locked".)
+3. Open `https://<domain>/` → it goes to `/setup`. Enter the key, the hotel,
+   floors and rooms (`101-120` adds every room in between), areas, storage
+   places, guest support details and the first administrator.
+4. Complete setup → sign-in page → sign in as that administrator → add staff
+   on the Staff page.
+5. **Delete `SETUP_TOKEN`** from the variables. Setup is refused by the
+   database anyway; removing the key closes the page for good.
+
+A setup that fails part-way leaves nothing behind (the administrator's login is
+removed again) and can simply be repeated.
 
 ## Rolling back
 

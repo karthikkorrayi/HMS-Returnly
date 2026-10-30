@@ -1,5 +1,8 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { connection } from 'next/server'
+import { withAnon } from '@/lib/db'
+import { isSetUp } from '@/lib/setup'
 import ReturnlyIcon from '@/components/ReturnlyIcon'
 import EnquiryChat from '@/components/enquiry/EnquiryChat'
 import { listHotels } from '@/lib/requests/public-actions'
@@ -29,6 +32,9 @@ const STEPS = [
 export default async function Home() {
   // The hotel list comes from the database on every request (never at build time).
   await connection()
+  // A brand-new installation goes to first-time setup. (If the database can't
+  // be asked, the page shows as before: "Enquiries aren't available".)
+  if ((await isSetUp(withAnon).catch(() => true)) === false) redirect('/setup')
   const hotels = await listHotels()
   const today = hotelToday()
 
