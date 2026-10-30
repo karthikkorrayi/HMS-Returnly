@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { ITEM_ROLES, requireSession } from '@/lib/auth'
 import { withStaff } from '@/lib/db'
+import { loadLoggingChoices } from '@/lib/hotel-config'
 import type { RoomCheck } from '@/lib/types'
 import LogItemForm from './LogItemForm'
 
@@ -13,8 +14,9 @@ export default async function NewItemPage({
   const params = await searchParams
   // Read as this staff member (row-level security: their hotel only).
   const checkId = params.check && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.check) ? params.check : null
-  const { rooms, found } = await withStaff(staff.user_id, async (tx) => ({
-    rooms: (await tx.query<{ room_number: string }>(`select room_number from public.rooms order by room_number`)).rows,
+  // Rooms and areas in use (managers retire old ones under Settings).
+  const { choices, found } = await withStaff(staff.user_id, async (tx) => ({
+    choices: await loadLoggingChoices(tx),
     found: checkId
       ? (await tx.query<Pick<RoomCheck, 'id' | 'room_number' | 'outcome'>>(
           `select id, room_number, outcome::text as outcome from public.room_checks where id = $1`, [checkId])).rows[0]
@@ -24,6 +26,7 @@ export default async function NewItemPage({
   // Opened from a room check ("Items found – log them"): lock the item to that
   // room and link it to the check, so tracing knows which departure it followed.
   const check = found?.outcome === 'items_found' ? found : null
+  const rooms = choices.rooms.map((room_number) => ({ room_number }))
   const roomFromLink =
     check?.room_number ??
     (params.room && (rooms ?? []).some((r) => r.room_number === params.room) ? params.room : undefined)
@@ -41,7 +44,8 @@ export default async function NewItemPage({
         </p>
       )}
       <LogItemForm
-        rooms={(rooms ?? []).map((r) => r.room_number)}
+        rooms={choices.rooms}
+        areas={choices.areas}
         initialRoom={roomFromLink}
         roomCheckId={check?.id}
       />

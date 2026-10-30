@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { MAX_PHOTOS, uploadItemPhotos } from '@/lib/photos'
 import { saveItem } from './actions'
-import { CATEGORIES, PUBLIC_AREAS, TIER_HINT, TIER_LABEL, type ValueTier } from '@/lib/types'
+import { CATEGORIES, TIER_HINT, TIER_LABEL, type ValueTier } from '@/lib/types'
 import PhotoPicker from '@/components/PhotoPicker'
 
 function localNowForInput() {
@@ -15,10 +15,13 @@ function localNowForInput() {
 
 export default function LogItemForm({
   rooms,
+  areas,
   initialRoom,
   roomCheckId,
 }: {
   rooms: string[]
+  /** The hotel's public areas (suggestions; any wording is accepted). */
+  areas: string[]
   initialRoom?: string
   roomCheckId?: string
 }) {
@@ -165,7 +168,7 @@ export default function LogItemForm({
               required
             />
             <datalist id="area-list">
-              {PUBLIC_AREAS.map((a) => (
+              {areas.map((a) => (
                 <option key={a} value={a} />
               ))}
             </datalist>

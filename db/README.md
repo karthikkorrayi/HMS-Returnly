@@ -11,6 +11,7 @@ instead of Supabase. Supabase production is unchanged until launch.
 | `migrations/20261024000010_staff_admin.sql` | **Railway only.** `add_staff_member()` and `set_staff_active()`: the only way the app can add a staff row or change access; each checks the caller is an active manager of the same hotel | `app_owner` | after 009 |
 | `migrations/20261026000011_sign_in_guard.sql` | **Railway only.** `auth.sign_in_failures` (wrong-password lock per username) and `auth.users.blocked` (deactivated staff cannot sign in), kept in step by `set_staff_active()` | `app_owner` | after 010 |
 | `migrations/20261030000012_hotel_setup.sql` | **Railway only.** First-time setup (`installation`, `setup_status()`, `complete_initial_setup()`: once only, all or nothing), `floors` + `rooms.floor_id`/`rooms.active`, `areas`, hotel contact and support details, `update_hotel_details()`, `update_staff_member()`. Additive; existing hotels get floors from their rooms, the default areas, and count as set up | `app_owner` | after 011 |
+| `migrations/20261030000013_public_contacts.sql` | **Railway only.** `public_hotel_contacts()`: the hotel's phone, email, support hours and note for guests (no sign-in) | `app_owner` | after 012 |
 | `migrate.mjs` | The runner: applies `migrations/` in order, one transaction per file, recording each file's SHA-256 in `ops.schema_migrations` | `app_owner` via `MIGRATION_DATABASE_URL` | every deploy (Phase 7 pre-deploy step) |
 
 While `supabase/migrations/` still exists (until launch), change both folders together:
