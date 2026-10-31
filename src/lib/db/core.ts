@@ -1,6 +1,6 @@
 // Data layer for plain Postgres (Railway). Every database call made by the app
 // goes through withStaff() or withAnon(), which run it inside one transaction
-// as a restricted role, exactly as Supabase did:
+// as a restricted role:
 //
 //   BEGIN;
 //   SET LOCAL ROLE authenticated;                          -- or anon
@@ -10,7 +10,7 @@
 //
 // Row-level security and the workflow functions then decide what is allowed.
 // "LOCAL" settings end with the transaction, so nothing can leak to the next
-// request that reuses the pooled connection (see supabase/tests/platform.test.mjs).
+// request that reuses the pooled connection (see db/tests/platform.test.mjs).
 //
 // This file has no Next.js imports so the tests can load it directly;
 // the app imports it through ./index.ts (server-only).
@@ -30,7 +30,7 @@ export interface PoolLike {
 export interface Tx {
   /** Run one parameterised statement ($1, $2, …). Never build SQL from user input. */
   query<T extends Row = Row>(sql: string, params?: unknown[]): Promise<QueryResult<T>>
-  /** Call public.<fn>(name => value, …) and return its rows, like supabase.rpc(). */
+  /** Call public.<fn>(name => value, …) and return its rows. */
   rpc<T extends Row = Row>(fn: string, args?: Record<string, unknown>): Promise<QueryResult<T>>
 }
 

@@ -1,5 +1,7 @@
 # Backend API — stays, room checks and lost item tracing
 
+> Written for the original Supabase version. On Railway the same database functions are called through the app's data layer (`src/lib/db`: `withStaff()` / `withAnon()`, `tx.rpc('…')`) instead of `supabase.rpc`; their names, arguments and rules are unchanged.
+
 Supabase is the single source of truth. Three kinds of endpoint:
 
 - **Reads** go through Supabase's REST API (`supabase.from('…').select()`), filtered by row-level security to the signed-in staff member's hotel and role.

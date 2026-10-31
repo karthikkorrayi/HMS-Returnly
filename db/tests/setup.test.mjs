@@ -23,7 +23,7 @@ async function open(suite, { upTo = MIGRATIONS.length, seed = false } = {}) {
   for (const f of MIGRATIONS.slice(0, upTo)) {
     await t.db.exec(`set role app_owner;\n${readFileSync(`${ROOT}/db/migrations/${f}`, 'utf8')}\n;reset role;`)
   }
-  if (seed) await t.db.exec(`set role app_owner;\n${readFileSync(`${ROOT}/supabase/seed.sql`, 'utf8')}\n;reset role;`)
+  if (seed) await t.db.exec(`set role app_owner;\n${readFileSync(`${ROOT}/db/seed.sql`, 'utf8')}\n;reset role;`)
   return t
 }
 

@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unused-expressions -- `cond ? pass() : fail()` checks */
 // Run with: npm run test:db
 // Stay log, room checks, room board and ownership tracing
-// (migration 20261006000005). Applies every migration in PGlite with
-// Supabase auth/storage stubbed, then exercises the rules per role.
+// (migration 20261006000005). Applies the bootstrap and every migration (as on Railway),
+// then exercises the rules per role.
 import { openTestDb } from './test-db.mjs'
 import { readFileSync, readdirSync } from 'node:fs'
 
@@ -13,32 +13,13 @@ let failures = 0
 const pass = (m) => console.log('  ok   ' + m)
 const fail = (m) => { failures++; console.log('  FAIL ' + m) }
 
-await db.exec(`
-  do $$ begin
-    if not exists (select from pg_roles where rolname = 'anon') then create role anon nologin; end if;
-    if not exists (select from pg_roles where rolname = 'authenticated') then create role authenticated nologin; end if;
-  end $$;
-  alter default privileges in schema public grant all on tables to anon, authenticated;
-  alter default privileges in schema public grant all on sequences to anon, authenticated;
-  grant usage on schema public to anon, authenticated;
-  create schema auth; grant usage on schema auth to authenticated, anon;
-  create table auth.users (id uuid primary key);
-  create function auth.uid() returns uuid language sql stable as
-    $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
-  create schema storage; grant usage on schema storage to authenticated;
-  create table storage.buckets (id text primary key, name text, public boolean,
-    file_size_limit bigint, allowed_mime_types text[]);
-  create table storage.objects (id uuid primary key default gen_random_uuid(),
-    bucket_id text, name text);
-  alter table storage.objects enable row level security;
-  grant all on storage.objects to authenticated;
-  create function storage.foldername(name text) returns text[] language sql immutable as
-    $$ select (string_to_array(name, '/'))[1:array_length(string_to_array(name, '/'), 1) - 1] $$;
-`)
+// --- Schema exactly as Railway has it: bootstrap (roles, schema auth) as the
+// superuser, then every migration and the demo seed as app_owner.
+await db.exec(readFileSync(`${REPO}/bootstrap/000_platform.sql`, 'utf8'))
 for (const f of readdirSync(`${REPO}/migrations`).sort()) {
-  await db.exec(readFileSync(`${REPO}/migrations/${f}`, 'utf8'))
+  await db.exec(`set role app_owner;\n${readFileSync(`${REPO}/migrations/${f}`, 'utf8')}\n;reset role;`)
 }
-await db.exec(readFileSync(`${REPO}/seed.sql`, 'utf8'))
+await db.exec(`set role app_owner;\n${readFileSync(`${REPO}/seed.sql`, 'utf8')}\n;reset role;`)
 
 const U = {
   mgr: '00000000-0000-0000-0000-000000000001',

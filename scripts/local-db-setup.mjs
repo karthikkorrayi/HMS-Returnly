@@ -5,6 +5,7 @@
 //
 //   npm run db:local:setup                 # database returnly_dev
 //   npm run db:local:setup -- --database returnly_dev2
+//   npm run db:local:setup -- --database returnly_fresh --no-seed   # empty: rehearse first-time setup
 //
 // Safe to run again: it never drops or empties anything. On an existing
 // database it re-applies the (idempotent) bootstrap, applies only migrations
@@ -25,7 +26,7 @@ const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]'])
 
 class SetupError extends Error {}
 
-export async function setupLocalDb({ adminUrl, database, log = console.log }) {
+export async function setupLocalDb({ adminUrl, database, seed = true, log = console.log }) {
   if (!/^returnly_[a-z0-9_]{1,40}$/.test(database)) {
     throw new SetupError(`Database name must look like returnly_dev (got "${database}").`)
   }
@@ -82,9 +83,16 @@ export async function setupLocalDb({ adminUrl, database, log = console.log }) {
   try {
     await migrate({ query: (s, p) => owner.query(s, p), exec: (s) => owner.query(s) }, { apply: true, log: (m) => log('  ' + m) })
     log('✓ migrations up to date')
-    await owner.query(readFileSync(`${ROOT}supabase/seed.sql`, 'utf8'))
-    const n = (await owner.query(`select count(*)::int as n from public.properties where inn_code = 'DEMO'`)).rows[0].n
-    log(`✓ seed: DEMO hotel ${n === 1 ? 'present' : 'MISSING'} (synthetic data only)`)
+    if (seed) {
+      await owner.query(readFileSync(`${ROOT}db/seed.sql`, 'utf8'))
+      const n = (await owner.query(`select count(*)::int as n from public.properties where inn_code = 'DEMO'`)).rows[0].n
+      log(`✓ seed: DEMO hotel ${n === 1 ? 'present' : 'MISSING'} (synthetic data only)`)
+    } else {
+      const set = (await owner.query(`select public.setup_status() as s`)).rows[0].s
+      log(set
+        ? '• no seed: this database already has a hotel (set up)'
+        : '✓ no seed: an empty installation — the app will open the first-time setup screen')
+    }
   } finally {
     await owner.end()
   }
@@ -116,7 +124,10 @@ export function defaultAdminUrl(envLocalText) {
 async function main(argv) {
   let values
   try {
-    ;({ values } = parseArgs({ args: argv, options: { database: { type: 'string', default: 'returnly_dev' } } }))
+    ;({ values } = parseArgs({ args: argv, options: {
+      database: { type: 'string', default: 'returnly_dev' },
+      'no-seed': { type: 'boolean', default: false },
+    } }))
   } catch (e) {
     console.error(`\n  ✗ ${e.message}\n`)
     return 1
@@ -130,6 +141,7 @@ async function main(argv) {
     const { urls } = await setupLocalDb({
       adminUrl,
       database: values.database,
+      seed: !values['no-seed'],
     })
     console.log('\nConnection strings for .env.local (local only, no passwords):')
     for (const [k, v] of Object.entries(urls)) console.log(`  ${k}=${v}`)

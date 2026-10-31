@@ -44,7 +44,7 @@ if (kind === 'PGlite') {
 await db.exec(readFileSync(`${ROOT}/db/bootstrap/000_platform.sql`, 'utf8'))
 const owner = await connectAs('app_owner')
 await migrate({ query: owner.query, exec: owner.exec }, { apply: true, log: () => {} })
-await owner.exec(readFileSync(`${ROOT}/supabase/seed.sql`, 'utf8'))
+await owner.exec(readFileSync(`${ROOT}/db/seed.sql`, 'utf8'))
 const DEMO = (await owner.query(`select id from public.properties where inn_code = 'DEMO'`)).rows[0].id
 const staffRow = (id, username, role) => owner.query(`insert into public.staff (user_id, property_id, username, display_name, role, active)
   values ($1, $2, $3, $3, $4::public.staff_role, true)`, [id, DEMO, username, role])

@@ -23,7 +23,7 @@ await db.exec(readFileSync(`${ROOT}/db/bootstrap/000_platform.sql`, 'utf8'))
 for (const f of readdirSync(`${ROOT}/db/migrations`).sort()) {
   await db.exec(`set role app_owner;\n${readFileSync(`${ROOT}/db/migrations/${f}`, 'utf8')}\n;reset role;`)
 }
-await db.exec(`set role app_owner;\n${readFileSync(`${ROOT}/supabase/seed.sql`, 'utf8')}\n;reset role;`)
+await db.exec(`set role app_owner;\n${readFileSync(`${ROOT}/db/seed.sql`, 'utf8')}\n;reset role;`)
 const U = {
   hk: '00000000-0000-0000-0000-0000000000d1',
   fo: '00000000-0000-0000-0000-0000000000d2',
@@ -84,7 +84,7 @@ check((await detail(U.other, ID)) === null, 'staff of another hotel get "not fou
 check((await detail(U.hk, 'not-a-uuid')) === null, 'a malformed id gets "not found"')
 if (real) {
   check(/^\d{4}-\d\d-\d\dT.*Z$/.test(d0.item.found_at) && /^\d{4}-\d\d-\d\d$/.test(d0.item.dispose_after),
-    'times are ISO strings and dates YYYY-MM-DD (as from Supabase)', `${d0.item.found_at} ${d0.item.dispose_after}`)
+    'times are ISO strings and dates YYYY-MM-DD ', `${d0.item.found_at} ${d0.item.dispose_after}`)
 }
 
 console.log('\nStoring and moving')

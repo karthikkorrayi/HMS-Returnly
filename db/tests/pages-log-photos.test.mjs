@@ -53,7 +53,7 @@ await db.exec(readFileSync(`${ROOT}/db/bootstrap/000_platform.sql`, 'utf8'))
 for (const f of readdirSync(`${ROOT}/db/migrations`).sort()) {
   await db.exec(`set role app_owner;\n${readFileSync(`${ROOT}/db/migrations/${f}`, 'utf8')}\n;reset role;`)
 }
-await db.exec(`set role app_owner;\n${readFileSync(`${ROOT}/supabase/seed.sql`, 'utf8')}\n;reset role;`)
+await db.exec(`set role app_owner;\n${readFileSync(`${ROOT}/db/seed.sql`, 'utf8')}\n;reset role;`)
 const U = {
   hk: '00000000-0000-0000-0000-0000000000e1',
   fo: '00000000-0000-0000-0000-0000000000e2',

@@ -25,6 +25,7 @@ if (!['localhost', '127.0.0.1', '::1', '[::1]'].includes(host)) throw new Error(
 
 const name = `returnly_test_localdb_${process.pid}`
 const foreignName = `returnly_test_foreign_${process.pid}`
+const freshName = `returnly_test_fresh_${process.pid}`
 const quiet = () => {}
 const admin = new pg.Client({ connectionString: url })
 await admin.connect()
@@ -52,6 +53,12 @@ try {
   check((await one(first.urls.AUTH_DATABASE_URL, 'select current_user as u')).u === 'auth_service', 'AUTH_DATABASE_URL logs in as auth_service')
   check(Object.values(first.urls).every((u) => new URL(u).password === ''), 'printed URLs contain no password')
 
+  // An empty installation (--no-seed): no hotel, so the app offers first-time setup.
+  const fresh = await setupLocalDb({ adminUrl: url, database: freshName, seed: false, log: quiet })
+  const fc = await one(fresh.urls.MIGRATION_DATABASE_URL, `select public.setup_status() as s, (select count(*)::int from public.properties) as hotels`)
+  check(fresh.created && fc.s === false && fc.hotels === 0, '--no-seed gives an empty installation: no hotel, setup not done', JSON.stringify(fc))
+  check((await one(first.urls.MIGRATION_DATABASE_URL, `select public.setup_status() as s`)).s === true, 'while the seeded database counts as set up')
+
   await admin.query(`create database "${foreignName}"`)
   const c = new pg.Client({ connectionString: Object.assign(new URL(url), { pathname: '/' + foreignName }).toString() })
   await c.connect()
@@ -63,7 +70,7 @@ try {
 } catch (e) {
   fail('unexpected error: ' + e.message)
 } finally {
-  for (const db of [name, foreignName]) await admin.query(`drop database if exists "${db}" with (force)`)
+  for (const db of [name, foreignName, freshName]) await admin.query(`drop database if exists "${db}" with (force)`)
   await admin.end()
 }
 
