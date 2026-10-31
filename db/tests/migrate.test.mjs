@@ -126,28 +126,28 @@ const tooEarly = (await db.query(`select to_regclass('public.too_early') is null
 n1 === n0 && tooEarly ? pass('after the refusals the ledger and schema are unchanged') : fail('something changed during a refusal')
 
 console.log('\nNew files, failures and destructive SQL')
-const probe = variant((d) => writeFileSync(join(d, '20261101000009_probe.sql'),
+const probe = variant((d) => writeFileSync(join(d, '20991231000009_probe.sql'),
   'create table public.runner_probe (id int primary key);\nalter table public.runner_probe enable row level security;\n'))
 const added = await asOwner(() => migrate(owner, { files: readMigrations(probe), apply: true, log: quiet }))
-added.applied.join() === '20261101000009_probe.sql' ? pass('applies only the new file') : fail('applied: ' + added.applied)
+added.applied.join() === '20991231000009_probe.sql' ? pass('applies only the new file') : fail('applied: ' + added.applied)
 
 const broken = variant((d) => {
-  writeFileSync(join(d, '20261101000009_probe.sql'), readFileSync(join(probe, '20261101000009_probe.sql'), 'utf8'))
-  writeFileSync(join(d, '20261101000010_broken.sql'), 'create table public.half_done (id int);\nselect * from public.does_not_exist;\n')
+  writeFileSync(join(d, '20991231000009_probe.sql'), readFileSync(join(probe, '20991231000009_probe.sql'), 'utf8'))
+  writeFileSync(join(d, '20991231000010_broken.sql'), 'create table public.half_done (id int);\nselect * from public.does_not_exist;\n')
 })
-await asOwner(() => expectError('a failing file reports the error', () => migrate(owner, { files: readMigrations(broken), apply: true, log: quiet }), /20261101000010_broken\.sql failed and was rolled back/))
+await asOwner(() => expectError('a failing file reports the error', () => migrate(owner, { files: readMigrations(broken), apply: true, log: quiet }), /20991231000010_broken\.sql failed and was rolled back/))
 const halfGone = (await db.query(`select to_regclass('public.half_done') is null as gone`)).rows[0].gone
 halfGone && (await ledgerCount()) === n0 + 1 ? pass('…and its partial work is rolled back, not recorded') : fail('partial migration left behind')
 
 const dropper = variant((d) => {
-  writeFileSync(join(d, '20261101000009_probe.sql'), readFileSync(join(probe, '20261101000009_probe.sql'), 'utf8'))
-  writeFileSync(join(d, '20261101000011_drop.sql'), 'drop table public.runner_probe;\n')
+  writeFileSync(join(d, '20991231000009_probe.sql'), readFileSync(join(probe, '20991231000009_probe.sql'), 'utf8'))
+  writeFileSync(join(d, '20991231000011_drop.sql'), 'drop table public.runner_probe;\n')
 })
 await asOwner(() => expectError('destructive file is refused without --allow-destructive', () => migrate(owner, { files: readMigrations(dropper), apply: true, log: quiet }), /--allow-destructive/))
 const stillThere = (await db.query(`select to_regclass('public.runner_probe') is not null as ok`)).rows[0].ok
 stillThere ? pass('…and nothing was dropped') : fail('table dropped without the flag')
 const dropped = await asOwner(() => migrate(owner, { files: readMigrations(dropper), apply: true, allowDestructive: true, log: quiet }))
-dropped.applied.join() === '20261101000011_drop.sql' ? pass('with --allow-destructive it is applied') : fail('drop not applied')
+dropped.applied.join() === '20991231000011_drop.sql' ? pass('with --allow-destructive it is applied') : fail('drop not applied')
 
 // --- Real Postgres only: lock and command line ----------------------------------------
 console.log('\nLock and command line')

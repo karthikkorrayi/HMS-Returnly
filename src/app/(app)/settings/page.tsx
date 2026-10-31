@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { requireSession } from '@/lib/auth'
 import { withStaff } from '@/lib/db'
 import { loadAreas, loadFloors, loadHotelDetails, loadStorage } from '@/lib/hotel-config'
+import { cleanupStatus, loadLastCleanup } from '@/lib/daily-cleanup'
 import ActionForm from '@/components/ActionForm'
 import ReturnlyIcon from '@/components/ReturnlyIcon'
 import { saveSettings } from './actions'
@@ -9,12 +10,14 @@ import { saveHotelDetailsAction } from './config-actions'
 
 export default async function SettingsPage() {
   const { staff, property } = await requireSession(['manager'])
-  const { hotel, floors, areas, storage } = await withStaff(staff.user_id, async (tx) => ({
+  const { hotel, floors, areas, storage, lastCleanup } = await withStaff(staff.user_id, async (tx) => ({
     hotel: await loadHotelDetails(tx),
     floors: await loadFloors(tx),
     areas: await loadAreas(tx),
     storage: await loadStorage(tx),
+    lastCleanup: await loadLastCleanup(tx),
   }))
+  const cleanup = cleanupStatus(lastCleanup)
   const rooms = floors.floors.reduce((n, f) => n + f.rooms.filter((r) => r.active).length, 0) + floors.unassigned.filter((r) => r.active).length
 
   const retention = [
@@ -106,6 +109,11 @@ export default async function SettingsPage() {
             </div>
           ))}
         </ActionForm>
+        <div className={`mt-4 rounded-xl p-3 text-sm ${cleanup.state === 'ok' ? 'bg-paper' : 'bg-attention-soft text-attention'}`} role={cleanup.state === 'ok' ? undefined : 'alert'}>
+          <p className="font-semibold">Daily clean-up{cleanup.state === 'ok' ? '' : ' needs attention'}</p>
+          <p className="mt-0.5">{cleanup.text}</p>
+          <p className="hint mt-1">Every night it removes expired guest stays, closed enquiries past the time above, and old sign-in records. Lost items and photos are never removed automatically.</p>
+        </div>
       </section>
     </div>
   )
