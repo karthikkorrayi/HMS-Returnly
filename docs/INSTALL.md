@@ -38,8 +38,10 @@ About 30 minutes. Do it for staging first; production only at launch.
    per variable), pre-deploy `node db/migrate.mjs --apply`, health check
    `/api/health`, source = this repository and the environment's branch,
    **Wait for CI** on, generate a domain.
-4. **First deploy**: pre-deploy log ends `done: 13 applied` (or more);
+4. **First deploy**: pre-deploy log ends `done: 14 applied` (or more);
    `https://<domain>/api/health` → `{"status":"ok"}`.
+   Then add the **daily-cleanup** cron service (settings in RAILWAY.md) and
+   run it once by hand: its log ends `✓ done`.
 5. **Setup key**: `openssl rand -hex 24` on your Mac → variable `SETUP_TOKEN`
    on `web` → deploy.
 6. **First-time setup** on your phone: open `https://<domain>/` → setup screen.
@@ -120,9 +122,11 @@ Run on a phone, on the environment's address. Made-up data only on staging.
 - [ ] merge a small change → Railway waits for CI → deploys → records and setup unchanged
 - [ ] `/api/health` → `{"status":"ok"}`
 
+**Daily clean-up**
+- [ ] daily-cleanup run by hand → log ends `✓ done`; Settings shows "Last ran less than an hour ago"
+- [ ] the next morning: a scheduled run is in its log (03:30 UTC)
+
 ## Not covered yet (before production)
 
-- Scheduled clean-ups (expired stays, closed enquiries): were `pg_cron` on
-  Supabase; on Railway they become a scheduled job (Phase 6).
 - Off-platform backups with a timed restore drill (Phase 6), and photo backups.
 - Rate limits on `/track` lookups and enquiry submissions (Phase 6).

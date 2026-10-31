@@ -136,6 +136,45 @@ job becomes possible.
 (`Postgres` and `photos` are the service names on the canvas; adjust the
 references if they are named differently.)
 
+### daily-cleanup (scheduled job)
+
+Replaces Supabase's `pg_cron`. Once a night it runs `run_daily_cleanup()`
+(migration 014): removes stays past the stay retention, closed enquiries past
+the enquiry retention, expired sign-in sessions and tokens, and day-old
+sign-in counters. Lost items and photos are never removed. Every run, also a
+failed one, is recorded in `ops.job_runs`; managers see the last successful run
+under Settings → "How long records are kept", with a warning after 36 hours.
+
+| Setting | Value |
+|---|---|
+| Source | the same repository and branch as `web` |
+| Wait for CI | **on** |
+| Region | EU West |
+| Build command | default |
+| Start command | `node scripts/daily-cleanup.mjs` |
+| Pre-deploy command | **none** (only `web` migrates) |
+| Cron schedule | `30 3 * * *` (03:30 UTC = 03:30 in winter / 04:30 in summer, UK) |
+| Health check | none (it is not a web server) |
+| Restart policy | never (a failed night is retried by the next night; the warning shows it) |
+| Public domain | none |
+
+Variables on **daily-cleanup** (one only):
+
+```
+MIGRATION_DATABASE_URL=postgresql://app_owner:${{shared.APP_OWNER_PASSWORD}}@${{Postgres.RAILWAY_PRIVATE_DOMAIN}}:5432/returnly
+```
+
+- It logs in as `app_owner` because only the owner may run the clean-up; it
+  refuses any other login. Same credential and private network as `web`'s
+  pre-deploy; a dedicated, smaller role is a possible later improvement.
+- The job exits after each run (Railway skips the next run while one is still
+  active). Exit 0 = done, 1 = failed (logged with an error code only), 2 =
+  variable missing or wrong. The URL is never printed.
+- Log of a good run: `removed: stays 0, closed enquiries 0, sessions …` then `✓ done`.
+- Run it by hand: Railway CLI `railway cron run`; without the CLI, set the
+  schedule to `*/5 * * * *`, wait for one run in the log, set it back to
+  `30 3 * * *`. Running it more than once is harmless.
+
 ## First-time setup (once per environment)
 
 The full install, a local rehearsal, the after-install checklist and how to
@@ -176,3 +215,4 @@ removed again) and can simply be repeated.
 2. Sign in as a synthetic manager; open Dashboard, Requests, Staff, Settings.
 3. Log an item with a photo from a phone; open the photo.
 4. Public page: submit a synthetic enquiry, then follow it on `/track`.
+5. Settings → "Daily clean-up: Last ran … hours ago" (no warning).
