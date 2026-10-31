@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { getSession } from '@/lib/auth'
 import { getAuth } from '@/lib/better-auth/instance'
 import { withStaff } from '@/lib/db'
-import { StaffAdminError, addStaff, setStaffActive, setStaffPassword } from '@/lib/staff-admin'
+import { StaffAdminError, addStaff, setStaffActive, setStaffPassword, updateStaff } from '@/lib/staff-admin'
 import type { ActionState } from '@/lib/types'
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? '').trim()
@@ -59,5 +59,14 @@ export async function setActive(_p: ActionState, f: FormData): Promise<ActionSta
   return attempt(
     async () => setStaffActive(await getAuth(), withStaff, session.staff.user_id, userId, str(f, 'active') === 'true'),
     'Could not change access.'
+  )
+}
+
+export async function editStaff(_p: ActionState, f: FormData): Promise<ActionState> {
+  const session = await requireManager()
+  if (!session) return { error: 'Only managers can change staff.' }
+  return attempt(
+    () => updateStaff(withStaff, session.staff.user_id, str(f, 'user_id'), { displayName: str(f, 'display_name'), role: str(f, 'role') }),
+    'Could not save the change.'
   )
 }

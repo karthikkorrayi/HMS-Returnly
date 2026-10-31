@@ -22,7 +22,7 @@ import { createDb } from '../../src/lib/db/core.ts'
 import { loadStaffSession } from '../../src/lib/staff-session.ts'
 import { addStaffMember } from '../../src/lib/better-auth/add-staff.ts'
 import { StaffLoginError } from '../../src/lib/better-auth/staff-logins.ts'
-import { addStaff, setStaffPassword, setStaffActive, StaffAdminError } from '../../src/lib/staff-admin.ts'
+import { addStaff, setStaffPassword, setStaffActive, updateStaff, StaffAdminError } from '../../src/lib/staff-admin.ts'
 import { changeOwnPassword, OwnPasswordError } from '../../src/lib/better-auth/own-password.ts'
 
 const ROOT = new URL('../..', import.meta.url).pathname.replace(/\/$/, '')
@@ -260,6 +260,25 @@ await a4rejects(setStaffActive(auth, W, ben, anna, false), /Only managers/, 'a n
 await a4rejects(setStaffActive(auth, W, otherMgr.userId, cara, true), /not found/, 'another hotel’s manager cannot reactivate them')
 await setStaffActive(auth, W, mgr.userId, cara, true)
 check((await asStaff(cara))?.staff.active === true, 'reactivating restores access')
+
+console.log('\nStaff page  names and roles')
+await updateStaff(W, mgr.userId, cara, { displayName: ' Cara Jones ', role: 'front_office' })
+let caraNow = await asStaff(cara)
+check(caraNow?.staff.display_name === 'Cara Jones' && caraNow.staff.role === 'front_office', 'a manager renames someone and changes their role')
+await updateStaff(W, mgr.userId, cara, { displayName: 'Cara Jones', role: 'manager' })
+check((await asStaff(cara))?.staff.role === 'manager', 'a manager makes someone a manager (a second admin), effective on their next page')
+await a4rejects(updateStaff(W, mgr.userId, mgr.userId, { displayName: 'Demo Manager', role: 'support' }), /own role/, 'a manager cannot change their own role')
+await updateStaff(W, mgr.userId, mgr.userId, { displayName: 'Demo Manager (GM)', role: 'manager' })
+check((await asStaff(mgr.userId))?.staff.display_name === 'Demo Manager (GM)', 'but can change their own name')
+await updateStaff(W, cara, mgr.userId, { displayName: 'Demo Manager', role: 'manager' })
+pass('the second manager can edit the first')
+await updateStaff(W, mgr.userId, cara, { displayName: 'Cara Jones', role: 'housekeeping' })
+check((await asStaff(cara))?.staff.role === 'housekeeping', 'and a manager can set them back to housekeeping')
+await a4rejects(updateStaff(W, ben, cara, { displayName: 'X', role: 'manager' }), /Only managers/, 'a non-manager is refused by the database')
+await a4rejects(updateStaff(W, ben, ben, { displayName: 'Ben', role: 'manager' }), /Only managers/, 'nobody can promote themselves')
+await a4rejects(updateStaff(W, otherMgr.userId, cara, { displayName: 'X', role: 'support' }), /not found/, 'another hotel’s manager cannot change them')
+await a4rejects(updateStaff(W, mgr.userId, cara, { displayName: 'X', role: 'owner' }), /Choose a role/, 'an unknown role is refused')
+await a4rejects(updateStaff(W, mgr.userId, cara, { displayName: '  ', role: 'support' }), /name/, 'an empty name is refused')
 
 console.log('\nPhase 6  wrong-password lock per username')
 let ipN = 0

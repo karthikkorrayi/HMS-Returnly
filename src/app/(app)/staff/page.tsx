@@ -1,8 +1,17 @@
 import { requireSession } from '@/lib/auth'
 import { withStaff } from '@/lib/db'
 import { ROLE_LABEL, type Staff } from '@/lib/types'
+import { ROLE_ORDER, ROLE_PERMISSIONS } from '@/lib/role-permissions'
 import ActionForm from '@/components/ActionForm'
-import { createStaff, resetPassword, setActive } from './actions'
+import InlineAction from '@/components/InlineAction'
+import { createStaff, editStaff, resetPassword, setActive } from './actions'
+
+const ROLE_OPTIONS = [
+  { value: 'housekeeping', label: 'Housekeeping' },
+  { value: 'front_office', label: 'Front office' },
+  { value: 'support', label: 'Support' },
+  { value: 'manager', label: 'Manager (admin)' },
+]
 
 export default async function StaffPage() {
   const { staff: me } = await requireSession(['manager'])
@@ -82,6 +91,24 @@ export default async function StaffPage() {
                   </p>
                 </div>
               </div>
+              <details className="mt-3">
+                <summary className="cursor-pointer text-sm font-semibold text-teal">Edit name or role</summary>
+                <InlineAction action={editStaff} hidden={{ user_id: s.user_id, ...(s.user_id === me.user_id ? { role: s.role } : {}) }}
+                  submitLabel="Save" okText="Saved" className="mt-3">
+                  <div className="min-w-44 flex-1">
+                    <label htmlFor={`name-${s.user_id}`} className="label">Name</label>
+                    <input id={`name-${s.user_id}`} name="display_name" className="field" defaultValue={s.display_name} maxLength={80} required />
+                  </div>
+                  <div className="w-48">
+                    <label htmlFor={`role-${s.user_id}`} className="label">Role</label>
+                    <select id={`role-${s.user_id}`} name={s.user_id === me.user_id ? undefined : 'role'} className="field"
+                      defaultValue={s.role} disabled={s.user_id === me.user_id}>
+                      {ROLE_OPTIONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+                    </select>
+                  </div>
+                </InlineAction>
+                {s.user_id === me.user_id && <p className="hint mt-2">You can’t change your own role: another manager can.</p>}
+              </details>
               {s.user_id !== me.user_id && (
                 <details className="mt-3">
                   <summary className="cursor-pointer text-sm font-semibold text-teal">Manage access</summary>
@@ -105,6 +132,24 @@ export default async function StaffPage() {
                   </div>
                 </details>
               )}
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section aria-labelledby="roles" className="panel p-4 sm:p-5">
+        <h2 id="roles" className="text-lg font-bold">What each role can do</h2>
+        <p className="hint mt-1">These rules are built into the system; a manager chooses each person’s role above.</p>
+        <ul className="mt-3 divide-y divide-line">
+          {ROLE_PERMISSIONS.map((p) => (
+            <li key={p.what} className="py-3">
+              <p>{p.what}</p>
+              {p.note && <p className="hint">{p.note}</p>}
+              <p className="mt-1.5 flex flex-wrap gap-1.5">
+                {ROLE_ORDER.filter((r) => p.roles.includes(r)).map((r) => (
+                  <span key={r} className="rounded-md bg-teal-soft px-2 py-0.5 text-xs font-semibold text-teal-dark">{ROLE_LABEL[r]}</span>
+                ))}
+              </p>
             </li>
           ))}
         </ul>
