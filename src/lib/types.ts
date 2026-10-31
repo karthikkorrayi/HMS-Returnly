@@ -1,5 +1,5 @@
 // Shared types and labels. Values mirror the enums and checks in
-// supabase/migrations — change both together.
+// db/migrations — change both together.
 
 // manager = Admin in the UI. support = Support department (customer enquiries).
 export type StaffRole = 'housekeeping' | 'front_office' | 'manager' | 'support'

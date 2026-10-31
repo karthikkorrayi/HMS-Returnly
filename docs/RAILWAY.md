@@ -138,6 +138,9 @@ references if they are named differently.)
 
 ## First-time setup (once per environment)
 
+The full install, a local rehearsal, the after-install checklist and how to
+reinstall safely are in [INSTALL.md](INSTALL.md).
+
 Each environment has its own database, so each is set up exactly once: staging
 with a made-up hotel, production with the real one at launch. Deploys never
 repeat it: the database records that setup is done (`installation`) and

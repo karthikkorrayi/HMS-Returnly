@@ -1,5 +1,4 @@
-// How values come back from Postgres, so pages see exactly what they saw from
-// Supabase (which returned JSON):
+// How values come back from Postgres, so pages get plain, predictable values:
 //   date         → 'YYYY-MM-DD' string. node-postgres would otherwise make a
 //                  JavaScript Date at LOCAL midnight, which shifts the day in
 //                  some time zones (e.g. 2026-10-24 becomes 2026-10-23T18:30Z

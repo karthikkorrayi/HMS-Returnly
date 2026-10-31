@@ -2,7 +2,7 @@
 
 Housekeeping logs items left behind in rooms and public areas, with photos. Customers send lost property enquiries from the public home page; Support staff investigate them and an Admin approves or rejects each claim. The front desk records how items go back to guests, and managers approve disposal of unclaimed items after the retention period. Every step is written to an audit log that can't be edited or deleted.
 
-Built with Next.js 16 (App Router) and Supabase (Postgres, Auth, Storage), in a Supabase project of its own.
+Built with Next.js 16 (App Router), PostgreSQL (row-level security does the access control), Better Auth (staff sign-in) and a private S3-compatible bucket for photos. Runs on Railway: one environment per stage (staging, production), each with its own database. Each installation serves one hotel, set up once through a first-time setup screen.
 
 ## Data rules
 
@@ -10,7 +10,7 @@ Built with Next.js 16 (App Router) and Supabase (Postgres, Auth, Storage), in a 
 - **Customers never see hotel records.** The public pages return only their own enquiry's status and messages, after matching reference + booking ID. Matches, item details, internal notes and staff names are staff-only.
 - **Sensitive items** (passports, ID, bank cards, medication) cannot be photographed, and must be stored in a secure location.
 - **Valuable and sensitive items** need a second staff member as witness at handover. Disposal and donation always need a witness and a manager.
-- Photos are resized and stripped of EXIF metadata (including GPS) on the device before upload. They live in a private bucket and are shown through 30-minute signed links.
+- Photos are resized on the device, and the server strips EXIF/XMP metadata (including GPS) before storing them in a private bucket. They are only shown through the app, after it checks the staff member may see that item.
 - Every row is scoped to the signed-in staff member's hotel by row-level security. Status changes go only through database functions, which check the role and the allowed transitions.
 
 ## Roles
@@ -27,7 +27,7 @@ Built with Next.js 16 (App Router) and Supabase (Postgres, Auth, Storage), in a 
 | Enquiries: notes, ask the customer, mark ready for admin | | | ✓ | ✓ |
 | Enquiries: assign, approve, reject, resolve | | | | ✓ |
 | Dispose or donate after retention | | | | ✓ |
-| Delete photos, add and deactivate staff, settings | | | | ✓ |
+| Delete photos, staff (add, roles, passwords, access), settings, rooms and areas | | | | ✓ |
 
 These rules are enforced in the database (row-level security, triggers and workflow functions) as well as in the pages; hiding a link is never the protection.
 
@@ -56,31 +56,24 @@ The Rooms and Stays screens have been removed. Their tables (`stays`, `room_chec
 
 ## Setup
 
-1. **Create a Supabase project** in the **London (eu-west-2)** region, under an organisation rather than a personal account.
-2. **Apply the database.** Either:
-   - with the [Supabase CLI](https://supabase.com/docs/guides/cli): `supabase link --project-ref <ref>`, then `supabase db push`, then run `supabase/seed.sql` for demo data; or
-   - paste each file in `supabase/migrations/` into the SQL editor in filename order, then `supabase/seed.sql`.
-   Run `…000007_support_role.sql` on its own, before `…000008`: Postgres can't use a new role value in the same run that adds it.
-3. **Turn off public sign-ups** in the project's Authentication settings ("Allow new users to sign up"). Staff accounts are created by managers only.
-4. **Configure the app:** `cp .env.example .env.local`, then fill in the URL and keys from Project Settings → API.
-5. **Create the first manager:**
-   ```bash
-   npm install
-   npm run create-staff -- --property DEMO --username demo.manager --name "Demo Manager" --role manager
-   ```
-6. **Run it:** `npm run dev` for the laptop. To try it on a phone on the same Wi-Fi, set `DEV_LAN_HOST` in `.env.local` to your computer's LAN IP, run `npm run dev:lan`, and open `http://<that-ip>:3000` on the phone. For a production-like test, `npm run build` then `npm run start:lan`.
-7. **Schedule the clean-ups** (once): Database → Extensions → enable `pg_cron`, then in the SQL editor run
-   ```sql
-   select cron.schedule('purge-expired-stays', '30 3 * * *', $$select public.purge_expired_stays()$$);
-   select cron.schedule('purge-closed-requests', '40 3 * * *', $$select public.purge_closed_requests()$$);
-   ```
-8. **Create Support staff** on the Staff page (role: Support), then assign enquiries to them from Customer requests.
+### Local development (Mac)
+
+1. **PostgreSQL 17+** (Postgres.app) and **versitygw** for photos (`brew install versitygw`). Node 22 (`.nvmrc`).
+2. `npm ci`, then `cp .env.example .env.local` and fill it in (database URLs come from the next step; secrets are generated locally and never committed).
+3. `npm run db:local:setup`: creates `returnly_dev` (roles, every migration, the synthetic DEMO hotel). It finds your server from `DATABASE_URL` in `.env.local`; run it again after pulling new migrations.
+4. `npm run create-staff -- --property DEMO --username demo.manager --name "Demo Manager" --role manager` (asks for the password twice).
+5. `npm run storage:local` (photo store) and `npm run dev`. On a phone on the same Wi-Fi: set `DEV_LAN_HOST` and `BETTER_AUTH_URL` to your Mac's IP, run `npm run dev:lan`, open `http://<that-ip>:3000`.
+
+### Railway (staging and production)
+
+- How each environment is configured, deployed and rolled back: [docs/RAILWAY.md](docs/RAILWAY.md).
+- Installing a hotel from nothing, rehearsing it, and reinstalling safely: [docs/INSTALL.md](docs/INSTALL.md).
+
+Deploys are automatic once CI passes (staging from `railway`; production from a release merge in Phase 8). Before each deploy Railway runs the new migrations; data is never reset by a deploy, and the first-time setup only appears for an empty database.
 
 ### Real hotel data
 
-Build and demo with the seeded `DEMO` property. Before real use:
-- get written approval from the hotel's general manager for the data this holds (staff names, item photos, reservation numbers and guest surnames in the stay log); and
-- replace the demo property, rooms and storage locations with the hotel's own, and set the retention period to the hotel's policy.
+Staging only ever holds made-up data. Before real use (production): written approval from the hotel's general manager for the data this holds (staff names, item photos, reservation numbers, guest names and booking IDs in enquiries), and retention periods set to the hotel's policy.
 
 ## Checks
 
@@ -88,9 +81,9 @@ Build and demo with the seeded `DEMO` property. Before real use:
 npm run lint
 npm run typecheck
 npm test          # unit tests in tests/
-npm run test:db   # applies migrations in an in-memory Postgres and tests every role and workflow rule
-# Same tests on a real local Postgres 17 (CI does this too). Each suite makes and drops its own database:
-TEST_DATABASE_URL=postgresql://postgres@localhost:5432/postgres npm run test:db
+npm run test:db   # db/tests: applies the bootstrap and migrations in an in-memory Postgres and tests every role and workflow rule
+# Same tests on a real local PostgreSQL (CI uses 18). Each suite makes and drops its own database:
+TEST_DATABASE_URL=postgresql://postgres@localhost:5433/postgres npm run test:db
 npm run build
 ```
 
@@ -99,9 +92,8 @@ The same checks run in GitHub Actions on every push and pull request.
 ## Not built yet
 
 - AI chat assistant (the rule-based guided form is in place; see docs/backend-api.md for the integration contract)
-- Email notifications to customers when staff reply (customers check `/track` for now)
+- Email to customers (enquiry reference and replies) and a handover code (OTP): planned after setup; needs a mail provider with an EU option and a data-processing agreement
 - Automatic PMS sync for bookings
-- Screens for managers to edit rooms and storage locations (use the SQL editor for now)
 - Editing an item's description after logging
 - Removing photos from storage automatically once an item is closed
 - Offline logging for rooms with poor Wi-Fi

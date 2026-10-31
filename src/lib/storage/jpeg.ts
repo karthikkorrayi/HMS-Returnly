@@ -11,7 +11,7 @@
 // and drop APP1–APP15 and COM. APP0 (JFIF) is kept; it holds no personal data.
 export class PhotoRejected extends Error {}
 
-export const MAX_PHOTO_BYTES = 5 * 1024 * 1024 // same limit as the old Supabase bucket
+export const MAX_PHOTO_BYTES = 5 * 1024 * 1024 // 5 MB per photo
 
 const SOI = 0xd8
 const EOI = 0xd9

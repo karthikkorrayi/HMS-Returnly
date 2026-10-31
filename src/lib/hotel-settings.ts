@@ -1,7 +1,7 @@
 // Hotel settings a manager can change (page port, group 4). Both values are
-// saved in ONE transaction as the manager: either both change or neither
-// (on Supabase they were two separate calls). The database functions check
-// that the caller is a manager and enforce the allowed ranges.
+// saved in ONE transaction as the manager: either both change or neither.
+// The database functions check that the caller is a manager and enforce the
+// allowed ranges.
 // No Next.js imports, so tests can run it.
 import type { Tx } from '@/lib/db/core'
 import type { Property } from '@/lib/types'

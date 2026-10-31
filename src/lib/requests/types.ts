@@ -1,4 +1,4 @@
-// Customer enquiries. Values mirror supabase/migrations/…0008_customer_requests.sql.
+// Customer enquiries. Values mirror db/migrations/…0008_customer_requests.sql.
 
 import type { ItemStatus, ValueTier } from '@/lib/types'
 
