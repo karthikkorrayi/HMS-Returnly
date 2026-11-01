@@ -14,8 +14,14 @@ export default function PhotoPicker({
 }) {
   const cameraRef = useRef<HTMLInputElement>(null)
   const galleryRef = useRef<HTMLInputElement>(null)
-  const previews = useMemo(() => files.map((f) => URL.createObjectURL(f)), [files])
-  useEffect(() => () => previews.forEach((u) => URL.revokeObjectURL(u)), [previews])
+  const previews = useMemo(
+    () => files.map((f) => URL.createObjectURL(f)),
+    [files],
+  )
+  useEffect(
+    () => () => previews.forEach((u) => URL.revokeObjectURL(u)),
+    [previews],
+  )
 
   function add(list: FileList | null) {
     if (!list) return
@@ -30,13 +36,20 @@ export default function PhotoPicker({
       {files.length > 0 && (
         <ul className="grid grid-cols-3 gap-2">
           {previews.map((src, i) => (
-            <li key={src} className="relative aspect-square overflow-hidden rounded-lg bg-paper">
+            <li
+              key={src}
+              className="relative aspect-square overflow-hidden rounded-lg bg-paper"
+            >
               {/* eslint-disable-next-line @next/next/no-img-element -- local preview */}
-              <img src={src} alt={`Photo ${i + 1}`} className="h-full w-full object-cover" />
+              <img
+                src={src}
+                alt={`Photo ${i + 1}`}
+                className="h-full w-full object-cover"
+              />
               <button
                 type="button"
                 onClick={() => onChange(files.filter((_, j) => j !== i))}
-                className="absolute right-1 top-1 rounded-full bg-ink/80 px-2 py-0.5 text-sm font-semibold text-white"
+                className="absolute right-1 top-1 rounded-full bg-black/80 px-2 py-0.5 text-sm font-semibold text-white"
                 aria-label={`Remove photo ${i + 1}`}
               >
                 Remove
@@ -46,15 +59,27 @@ export default function PhotoPicker({
         </ul>
       )}
       <div className="grid grid-cols-2 gap-2">
-        <button type="button" className="btn btn-secondary" disabled={full} onClick={() => cameraRef.current?.click()}>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          disabled={full}
+          onClick={() => cameraRef.current?.click()}
+        >
           Take photo
         </button>
-        <button type="button" className="btn btn-secondary" disabled={full} onClick={() => galleryRef.current?.click()}>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          disabled={full}
+          onClick={() => galleryRef.current?.click()}
+        >
           From gallery
         </button>
       </div>
       <p className="hint">
-        {full ? `That’s the maximum of ${max}.` : `Up to ${max}. Photograph the item, not documents or cards.`}
+        {full
+          ? `That’s the maximum of ${max}.`
+          : `Up to ${max}. Photograph the item, not documents or cards.`}
       </p>
       <input
         ref={cameraRef}

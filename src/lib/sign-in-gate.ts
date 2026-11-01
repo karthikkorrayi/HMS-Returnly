@@ -6,9 +6,11 @@
 // first-time setup page (protected by its own key, and refused by the
 // database once setup is done), and API routes (they answer 401/403 as JSON
 // themselves, never redirect).
-const PUBLIC_PREFIXES = ['/login', '/track', '/setup', '/api']
+const PUBLIC_PREFIXES = ['/signin', '/login', '/track', '/setup', '/api']
 
 export function needsSignIn(pathname: string): boolean {
   if (pathname === '/') return false
-  return !PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + '/'))
+  return !PUBLIC_PREFIXES.some(
+    (p) => pathname === p || pathname.startsWith(p + '/'),
+  )
 }
