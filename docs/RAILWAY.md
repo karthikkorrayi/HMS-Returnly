@@ -126,7 +126,10 @@ S3_PATH_STYLE=false
   is refused as cross-site (403). Change it when a custom domain is added.
 - `S3_BUCKET` uses the bucket's `BUCKET` variable, not `RAILWAY_BUCKET_NAME`.
 - `AUTH_IP_HEADER`: Railway's edge overwrites `X-Real-IP`, so visitors can't
-  fake it (Railway staff, 2026). Still checked on staging.
+  fake it (Railway staff, 2026). Used by sign-in AND by the public pages' rate
+  limits (migration 015: 10 enquiries, 60 status checks, 30 replies per hour
+  per visitor). If the header were missing, every visitor would share one
+  limit: the web log then says `rate limit: no visitor IP …` (once per start).
 
 `MIGRATION_DATABASE_URL` sits on the web service because Railway's pre-deploy
 command only sees that service's variables. The app itself never reads it
@@ -216,3 +219,4 @@ removed again) and can simply be repeated.
 3. Log an item with a photo from a phone; open the photo.
 4. Public page: submit a synthetic enquiry, then follow it on `/track`.
 5. Settings → "Daily clean-up: Last ran … hours ago" (no warning).
+6. The web service's log has no `rate limit: no visitor IP` line.

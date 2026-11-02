@@ -117,6 +117,7 @@ Run on a phone, on the environment's address. Made-up data only on staging.
 - [ ] Log item in a public area → only active areas are suggested; a retired room is refused
 - [ ] store it, match a guest, record a handover
 - [ ] guest page: send an enquiry → reference; `/track` shows it; staff reply → customer sees it
+- [ ] `/track` with a wrong reference 61 times in an hour → "Too many checks from your connection"; another network (mobile data) still works
 
 **Deploy safety**
 - [ ] merge a small change → Railway waits for CI → deploys → records and setup unchanged
@@ -129,4 +130,3 @@ Run on a phone, on the environment's address. Made-up data only on staging.
 ## Not covered yet (before production)
 
 - Off-platform backups with a timed restore drill (Phase 6), and photo backups.
-- Rate limits on `/track` lookups and enquiry submissions (Phase 6).

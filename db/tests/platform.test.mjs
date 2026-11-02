@@ -91,10 +91,11 @@ anonTables.length === 0 ? pass('anon cannot read any table') : fail('anon can re
 const anonFns = (await db.query(`select p.proname from pg_proc p join pg_namespace s on s.oid = p.pronamespace
   where s.nspname = 'public' and p.prorettype <> 'trigger'::regtype
   and has_function_privilege('anon', p.oid, 'execute') order by 1`)).rows.map((r) => r.proname).join(',')
-// The four customer functions, the hotel's public contact details (013), and
-// the two the first-time setup screen needs before anyone can sign in (012).
-anonFns === 'complete_initial_setup,customer_reply,customer_request_status,public_hotel_contacts,public_properties,setup_status,submit_customer_request'
-  ? pass('anon can call exactly the five public functions and the two setup functions') : fail('anon functions: ' + anonFns)
+// The four customer functions, the hotel's public contact details (013), the
+// two the first-time setup screen needs before anyone can sign in (012), and
+// the per-visitor rate limit the public pages count before each action (015).
+anonFns === 'complete_initial_setup,customer_reply,customer_request_status,hit_rate_limit,public_hotel_contacts,public_properties,setup_status,submit_customer_request'
+  ? pass('anon can call exactly the five public functions, the two setup functions and the rate limit') : fail('anon functions: ' + anonFns)
 
 const ownerOnly = (await db.query(`select has_function_privilege('authenticated', 'public.purge_closed_requests()', 'execute') a,
   has_function_privilege('authenticated', 'public.purge_expired_stays()', 'execute') b,

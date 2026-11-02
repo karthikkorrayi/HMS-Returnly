@@ -13,7 +13,8 @@
 // problem (variable missing or wrong).
 import { fileURLToPath } from 'node:url'
 
-const KINDS = ['stays', 'closed_enquiries', 'sessions', 'verifications', 'rate_limits', 'sign_in_failures']
+// public_rate_hits arrived with migration 015; an older database simply reports 0.
+const KINDS = ['stays', 'closed_enquiries', 'sessions', 'verifications', 'rate_limits', 'sign_in_failures', 'public_rate_hits']
 
 /** Runs one clean-up on an open connection. Returns the summary; throws on failure. */
 export async function runCleanup(db, log = console.log) {
@@ -27,7 +28,7 @@ export async function runCleanup(db, log = console.log) {
   if (!fn.ok) throw new Error('run_daily_cleanup() does not exist yet: deploy the app first (its pre-deploy step applies migration 014)')
   const summary = (await db.query('select public.run_daily_cleanup() as s')).rows[0].s
   if (!summary.ok) throw new Error(`the clean-up failed in the database (error ${summary.error}); nothing was removed and the failure is recorded`)
-  const counts = Object.fromEntries(KINDS.map((k) => [k, summary[k]]))
+  const counts = Object.fromEntries(KINDS.map((k) => [k, summary[k] ?? 0]))
   log('removed: ' + KINDS.map((k) => `${k.replaceAll('_', ' ')} ${counts[k]}`).join(', '))
   return counts
 }
