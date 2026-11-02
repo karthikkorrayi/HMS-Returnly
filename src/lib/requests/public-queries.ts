@@ -3,7 +3,8 @@
 // which may call these four functions (public_properties,
 // submit_customer_request, customer_request_status, customer_reply), plus the
 // hotel's contact details (public_hotel_contacts, src/lib/hotel-config.ts)
-// and the setup status (src/lib/setup.ts). Those
+// the setup status (src/lib/setup.ts), and the per-visitor rate limit
+// (hit_rate_limit, src/lib/rate-limit.ts). Those
 // functions validate input, rate-limit, and return only what the customer may
 // see; staff data, item records and matches are never returned here.
 import type { Tx } from '@/lib/db/core'

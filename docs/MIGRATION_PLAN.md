@@ -58,7 +58,7 @@ Authorization lives in the database (RLS + workflow functions + triggers + audit
 | F2 | High (after move) | Storage rules (property folder, no photos on sensitive or closed items, 5 MB, JPEG/WebP, manager-only delete, Support blocked) must move into code; `storage_path` not validated against the item's property | Phase 5 |
 | F3 | Medium | No HTTP security headers | Phase 6 |
 | F4 | Medium | Purges not scheduled in the repo | Supabase: scheduled by hand (verified). Railway: Phase 6 cron service |
-| F5 | Medium | `customer_request_status` has no rate limit | Phase 6 |
+| F5 | Medium | `customer_request_status` has no rate limit | Phase 6: done in migration 015 (per-visitor limits on enquiry, status check, reply) |
 | F6 | Medium | Service-role key bypasses RLS for staff admin; replacement must use a narrow role | Phase 4 |
 | F7 | Low | Unused rooms/stays functions still granted to `authenticated` | Phase 3 decision, separate reversible migration |
 | F8 | Low | `create-staff` script rejects `support` | Phase 4 |
