@@ -127,6 +127,12 @@ Run on a phone, on the environment's address. Made-up data only on staging.
 - [ ] merge a small change → Railway waits for CI → deploys → records and setup unchanged
 - [ ] `/api/health` → `{"status":"ok"}`
 
+**Customer emails**
+- [ ] `email-dispatch` on `preview`: send a report → within 5 minutes Settings → Customer emails shows "Report received", "Preview only (not sent)", with the link hidden
+- [ ] `live` with `EMAIL_ALLOWLIST` = your own address: a report from that address arrives from "<Hotel> via Foundora <notifications@foundora.co.uk>"; its button opens the report; a report from another address shows "Not sent (not on the staging allowlist)"
+- [ ] staff ask a question / send a message / resolve → one email each; the email says there is a message, without its text
+- [ ] reply to the email → Zoho's auto-reply comes back
+
 **Daily clean-up**
 - [ ] daily-cleanup run by hand → log ends `✓ done`; Settings shows "Last ran less than an hour ago"
 - [ ] the next morning: a scheduled run is in its log (03:30 UTC)

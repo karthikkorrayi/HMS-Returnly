@@ -178,6 +178,50 @@ MIGRATION_DATABASE_URL=postgresql://app_owner:${{shared.APP_OWNER_PASSWORD}}@${{
   schedule to `*/5 * * * *`, wait for one run in the log, set it back to
   `30 3 * * *`. Running it more than once is harmless.
 
+### email-dispatch (scheduled job): customer emails
+
+Sends the customer emails the database has queued (migration 017: report
+received, contact required, new message, under review, matched, closed,
+resolved) through **Brevo's HTTPS API**. Railway blocks outbound SMTP below
+the Pro plan, so SMTP keys are not used. Sender: `notifications@foundora.co.uk`,
+shown as "<Hotel> via Foundora". Each email carries its own private tracking
+link; the copy kept in the database has the link blanked out. Managers see the
+log under Settings → Customer emails.
+
+| Setting | Value |
+|---|---|
+| Source | same repository and branch as `web` (Wait for CI on), EU West |
+| Start command | `node scripts/email-dispatch.mjs` |
+| Pre-deploy command | **none** |
+| Cron schedule | `*/5 * * * *` (every 5 minutes; Railway's minimum) |
+| Health check / domain / restart | none / none / never |
+
+Variables on **email-dispatch** (secrets only as references):
+
+```
+MIGRATION_DATABASE_URL=postgresql://app_owner:${{shared.APP_OWNER_PASSWORD}}@${{Postgres.RAILWAY_PRIVATE_DOMAIN}}:5432/returnly
+EMAIL_MODE=preview
+EMAIL_FROM=notifications@foundora.co.uk
+EMAIL_FROM_NAME=Foundora
+PUBLIC_BASE_URL=https://${{web.RAILWAY_PUBLIC_DOMAIN}}
+BREVO_API_KEY=${{shared.BREVO_API_KEY}}
+EMAIL_ALLOWLIST=<your own test addresses, comma-separated>
+```
+
+- `EMAIL_MODE`: `off` (nothing happens), `preview` (emails are written and
+  shown under Settings → Customer emails, **nothing is sent**), `live` (sent).
+  Staging stays on `preview` until the live test; on staging, `live` refuses to
+  start without `EMAIL_ALLOWLIST` and sends only to the addresses on it.
+- `BREVO_API_KEY` is a Brevo **API key** (starts `xkeysib-`), one per
+  environment, kept in that environment's Shared Variables. An SMTP key
+  (`xsmtpsib-`) is refused with a clear message.
+- Retries: 1, 5, 15, 60, 360 minutes; at most 6 attempts. A refused API key
+  (401/403) stops the run and keeps every email for the next one. An email
+  still waiting after a day is marked "expired" instead of arriving late.
+- Log of a good run: `emails: sent N, previewed N, …` then `✓ done`.
+- Same `app_owner` trade-off as `daily-cleanup`; a dedicated role with only
+  the sending rights is the planned improvement.
+
 ## First-time setup (once per environment)
 
 The full install, a local rehearsal, the after-install checklist and how to

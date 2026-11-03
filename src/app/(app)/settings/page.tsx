@@ -94,6 +94,13 @@ export default async function SettingsPage() {
             </span>
             <ReturnlyIcon name="arrow" />
           </Link>
+          <Link href="/settings/emails" className="flex items-center justify-between rounded-xl bg-paper p-4 hover:bg-teal-soft">
+            <span>
+              <span className="block font-semibold">Customer emails</span>
+              <span className="hint">What was emailed to customers, and whether it went</span>
+            </span>
+            <ReturnlyIcon name="arrow" />
+          </Link>
         </div>
       </section>
 
