@@ -56,6 +56,12 @@ destructiveStatements(`-- drop table x\ncreate table y (id int);`).length === 0
   ? pass('commented-out DROP is not flagged') : fail('comment flagged')
 const flagged = destructiveStatements(`drop table a; alter table b drop column c; truncate d; alter type e rename value 'x' to 'y';`)
 flagged.length === 4 ? pass('DROP TABLE, DROP COLUMN, TRUNCATE and RENAME are flagged') : fail('flagged: ' + JSON.stringify(flagged))
+destructiveStatements(`alter table t alter column a drop not null; alter table t alter column "b" drop default;`).length === 0
+  ? pass('ALTER COLUMN … DROP NOT NULL / DROP DEFAULT (only relaxing a rule) is not flagged') : fail('relaxing flagged')
+destructiveStatements(`alter table t alter column a drop not null, drop column c;`).length === 1
+  ? pass('…but the same statement with DROP COLUMN still is') : fail('drop column hidden by drop not null')
+destructiveStatements(`alter table t drop constraint k; alter table t alter column a drop identity;`).length === 2
+  ? pass('DROP CONSTRAINT and DROP IDENTITY are still flagged') : fail('constraint/identity not flagged')
 readMigrations().every((f) => f.destructive.length === 0)
   ? pass('none of the current migrations is destructive') : fail('a current migration is flagged destructive')
 

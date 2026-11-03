@@ -5,7 +5,7 @@ import { withStaff } from '@/lib/db'
 import { loadRequestDetail, loadRequestMatches } from '@/lib/queries/requests'
 import { formatDate, formatDateTime } from '@/lib/format'
 import { CATEGORY_LABEL, STATUS_LABEL, TIER_LABEL, type ItemStatus } from '@/lib/types'
-import { OPEN_REQUEST_STATUSES, REQUEST_STATUS_LABEL, type MatchRow } from '@/lib/requests/types'
+import { OPEN_REQUEST_STATUSES, REQUEST_STATUS_LABEL, WHEREABOUTS_LABEL, type MatchRow } from '@/lib/requests/types'
 import ActionForm from '@/components/ActionForm'
 import { MatchBandBadge, RequestStatusBadge } from '@/components/RequestBadges'
 import { addRequestNote, approveRequest, assignRequest, changeRequestStatus, messageCustomer } from '../actions'
@@ -51,15 +51,19 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
   const assignable = staff.filter((s) => s.active && (s.role === 'support' || s.role === 'manager'))
   const back = admin ? '/requests' : '/support'
 
+  const found = req.report_type === 'found'
   const facts: [string, string][] = [
-    ['Customer', req.customer_name],
-    ['Booking ID', req.booking_ref],
+    ['Report', found ? 'Found item (reported by a finder)' : 'Lost item'],
+    ...(found
+      ? ([['Where it is now', req.found_whereabouts ? WHEREABOUTS_LABEL[req.found_whereabouts] : '—']] as [string, string][])
+      : ([['Customer', req.customer_name ?? '—'], ['Booking ID', req.booking_ref ?? '—']] as [string, string][])),
+    ['Email', req.customer_email ?? 'Not given (sent before email was asked)'],
     ['Item', req.item_name],
     ['Type', req.category ? CATEGORY_LABEL[req.category] : 'Not given'],
     ['Colour', req.colour ?? '—'],
     ['Brand', req.brand ?? '—'],
-    ['Where', req.lost_location ?? '—'],
-    ['When', req.lost_date ? formatDate(req.lost_date) : 'Not sure'],
+    [found ? 'Where found' : 'Where', req.lost_location ?? '—'],
+    [found ? 'When found' : 'When', req.lost_date ? formatDate(req.lost_date) : 'Not sure'],
   ]
 
   return (
@@ -89,9 +93,14 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
               ))}
             </dl>
             <p className="mt-3 whitespace-pre-line rounded-lg bg-paper p-3">{req.description}</p>
-            <p className="hint mt-2">Booking ID and name are as typed by the customer — not verified. Check ID against the PMS before any handover.</p>
+            <p className="hint mt-2">
+              {found
+                ? 'Reported by a finder; their email is for updates only. Log the item when it reaches reception. Never tell the finder about an owner.'
+                : 'Booking ID, name and email are as typed by the customer — not verified. Check ID against the PMS before any handover.'}
+            </p>
           </section>
 
+          {!found && (
           <section aria-labelledby="matches" className="panel p-4 sm:p-5">
             <h2 id="matches" className="text-lg font-bold">Possible matches</h2>
             <p className="hint mt-1">Ranked by type, brand, colour, shared words, the booking’s room (from the stay log) and date. A suggestion, not proof of ownership.</p>
@@ -120,7 +129,7 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
                   <ul className="mt-2 list-disc space-y-0.5 pl-5 text-sm">
                     {m.reasons.map((r) => <li key={r}>{r}</li>)}
                   </ul>
-                  {admin && open && (
+                  {admin && open && !found && (
                     <details className="mt-3">
                       <summary className="cursor-pointer text-sm font-semibold text-teal">Approve with this item</summary>
                       <ActionForm
@@ -140,7 +149,7 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
                 </li>
               ))}
             </ol>
-            {admin && open && (
+            {admin && open && !found && (
               <details className="mt-4 rounded-lg border border-line p-3">
                 <summary className="cursor-pointer font-semibold">Approve with an item not listed</summary>
                 <ActionForm action={approveRequest} hidden={hidden} submitLabel="Approve" className="mt-3"
@@ -157,6 +166,7 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
               </details>
             )}
           </section>
+          )}
 
           <section aria-labelledby="conversation" className="panel p-4 sm:p-5">
             <h2 id="conversation" className="text-lg font-bold">Conversation with the customer</h2>
@@ -166,7 +176,7 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
                 <li key={m.id} className={`flex ${m.sender === 'customer' ? 'justify-start' : 'justify-end'}`}>
                   <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 ${m.sender === 'customer' ? 'rounded-bl-md bg-paper' : m.sender === 'staff' ? 'rounded-br-md bg-teal-soft' : 'rounded-br-md border border-line'}`}>
                     <p className="text-xs font-semibold text-muted">
-                      {m.sender === 'customer' ? req.customer_name : m.sender === 'staff' ? names[m.author_id ?? ''] ?? 'Staff' : 'Automatic message'} · {formatDateTime(m.created_at)}
+                      {m.sender === 'customer' ? (req.customer_name ?? 'Finder') : m.sender === 'staff' ? names[m.author_id ?? ''] ?? 'Staff' : 'Automatic message'} · {formatDateTime(m.created_at)}
                     </p>
                     <p className="mt-0.5 whitespace-pre-line">{m.body}</p>
                   </div>
@@ -226,11 +236,12 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
                 {admin && ['pending_review', 'awaiting_customer', 'awaiting_admin', 'approved', 'rejected'].includes(req.status) && (
                   <ActionForm action={changeRequestStatus} hidden={{ ...hidden, to: 'under_investigation' }} submitLabel={open ? 'Mark under investigation' : 'Reopen for investigation'} variant="secondary" />
                 )}
-                {admin && (req.status === 'approved' || req.status === 'rejected') && (
-                  <ActionForm action={changeRequestStatus} hidden={{ ...hidden, to: 'resolved' }} submitLabel="Resolve and close">
+                {admin && (req.status === 'approved' || req.status === 'rejected' || (found && open)) && (
+                  <ActionForm action={changeRequestStatus} hidden={{ ...hidden, to: 'resolved' }} submitLabel={found && open ? 'Resolve — item received' : 'Resolve and close'}>
+                    {found && open && <p className="hint">Log the item on the Log item page first, so it is tracked like any other found item.</p>}
                     <div>
                       <label htmlFor="resolve-note" className="label">Outcome <span className="font-normal text-muted">(optional)</span></label>
-                      <input id="resolve-note" name="note" className="field" maxLength={500} placeholder="e.g. Collected with photo ID" />
+                      <input id="resolve-note" name="note" className="field" maxLength={500} placeholder={found ? 'e.g. Handed in, logged as DEMO-…' : 'e.g. Collected with photo ID'} />
                     </div>
                   </ActionForm>
                 )}
@@ -246,7 +257,7 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
                     </ActionForm>
                   </details>
                 )}
-                {admin && open && <p className="hint">To approve, choose the matching item under Possible matches.</p>}
+                {admin && open && !found && <p className="hint">To approve, choose the matching item under Possible matches.</p>}
               </div>
             )}
 

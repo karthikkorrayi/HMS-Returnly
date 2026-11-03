@@ -1,10 +1,12 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
 import { ruleBasedAssistant, type ConversationState, type CustomerInput } from '@/lib/requests/assistant'
-import { submitEnquiry } from '@/lib/requests/public-actions'
+import { submitReport } from '@/lib/requests/public-actions'
+import { CONFIRM_EMAIL_TEXT, emailTypoHint, isValidEmail, normaliseEmail } from '@/lib/requests/email'
 import { CATEGORIES } from '@/lib/types'
+import EmailConfirm from './EmailConfirm'
+import TrackingLinkCard from './TrackingLinkCard'
 
 // Swap this for an AI-backed EnquiryAssistant later; the UI stays the same.
 const assistant = ruleBasedAssistant
@@ -17,11 +19,12 @@ export default function EnquiryChat({ hotels, today }: { hotels: Hotel[]; today:
   const [hotel, setHotel] = useState(hotels.length === 1 ? hotels[0].inn_code : '')
   const [name, setName] = useState('')
   const [booking, setBooking] = useState('')
+  const [email, setEmail] = useState('')
+  const [confirming, setConfirming] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
-  const [reference, setReference] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
+  const [sent, setSent] = useState<{ reference: string; token: string } | null>(null)
   const logRef = useRef<HTMLOListElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -48,12 +51,14 @@ export default function EnquiryChat({ hotels, today }: { hotels: Hotel[]; today:
     setConv((c) => ({ ...c, draft: { ...c.draft, [key]: value || null } }))
   }
 
-  async function onSubmit(e: React.FormEvent) {
+  // Step 1: check the form, then ask the customer to confirm their email.
+  function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     const next: Record<string, string> = {}
     if (!hotel) next.hotel = 'Choose the hotel you stayed at.'
     if (name.trim().length < 2) next.name = 'Enter your name as it appears on the booking.'
     if (!/^[A-Za-z0-9-\s]{3,40}$/.test(booking.trim())) next.booking = 'Enter the booking ID from your confirmation email.'
+    if (!isValidEmail(email)) next.email = 'Enter a valid email address.'
     if ((conv.draft.itemName ?? '').trim().length < 2) next.itemName = 'Say what the item is.'
     if ((conv.draft.description ?? '').trim().length < 3) next.description = 'Describe the item.'
     setErrors(next)
@@ -61,11 +66,19 @@ export default function EnquiryChat({ hotels, today }: { hotels: Hotel[]; today:
       document.getElementById(`enq-${Object.keys(next)[0]}`)?.focus()
       return
     }
+    setSubmitError(null)
+    setConfirming(true)
+  }
 
+  // Step 2: the customer pressed "Yes, send" on the confirmation.
+  async function onConfirmed() {
     setSubmitting(true)
     setSubmitError(null)
-    const res = await submitEnquiry({
+    const res = await submitReport({
       innCode: hotel,
+      reportType: 'lost',
+      email: normaliseEmail(email),
+      emailConfirmed: true,
       customerName: name,
       bookingRef: booking,
       itemName: conv.draft.itemName,
@@ -73,57 +86,31 @@ export default function EnquiryChat({ hotels, today }: { hotels: Hotel[]; today:
       category: conv.draft.category,
       colour: conv.draft.colour,
       brand: conv.draft.brand,
-      lostLocation: conv.draft.lostLocation,
-      lostDate: conv.draft.lostDate,
+      location: conv.draft.lostLocation,
+      date: conv.draft.lostDate,
+      whereabouts: null,
     })
     setSubmitting(false)
-    if (res.ok) setReference(res.reference)
+    setConfirming(false)
+    if (res.ok) setSent({ reference: res.reference, token: res.token })
     else setSubmitError(res.error)
   }
 
   function restart() {
     setConv(assistant.start(today))
-    setReference(null)
+    setSent(null)
+    setConfirming(false)
     setText('')
-    setCopied(false)
   }
 
-  if (reference) {
+  if (sent) {
     return (
-      <div className="panel p-5 sm:p-7" role="status" aria-live="polite">
-        <p className="text-sm font-semibold text-done">Enquiry sent</p>
-        <h3 className="mt-1 text-2xl font-bold">Your reference</h3>
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          <span className="tag tag-lg select-all">{reference}</span>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={async () => {
-              try {
-                await navigator.clipboard.writeText(reference)
-                setCopied(true)
-              } catch {
-                setCopied(false)
-              }
-            }}
-          >
-            {copied ? 'Copied' : 'Copy'}
-          </button>
-        </div>
-        <p className="mt-4 max-w-prose">
-          Keep this reference with your booking ID. A member of staff will check your enquiry against the items
-          we hold — <strong>this doesn’t mean your item has been found yet</strong>. Check back to see updates or
-          answer questions from the team.
-        </p>
-        <div className="mt-5 flex flex-wrap gap-3">
-          <Link href={`/track?ref=${encodeURIComponent(reference)}`} className="btn btn-primary">
-            Check status
-          </Link>
-          <button type="button" className="btn btn-secondary" onClick={restart}>
-            Report another item
-          </button>
-        </div>
-      </div>
+      <TrackingLinkCard
+        reference={sent.reference}
+        token={sent.token}
+        kind="lost"
+        onAnother={restart}
+      />
     )
   }
 
@@ -245,18 +232,38 @@ export default function EnquiryChat({ hotels, today }: { hotels: Hotel[]; today:
             <p className="hint mt-1">Include anything only the owner would know — an engraving, what’s inside, a scratch. Don’t include card or passport numbers.</p>
             {errors.description && <p className="mt-1 text-sm text-danger">{errors.description}</p>}
           </div>
-          {submitError && <p role="alert" className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{submitError}</p>}
-          <div className="flex flex-wrap items-center gap-3">
-            <button type="submit" className="btn btn-primary" disabled={submitting}>
-              {submitting ? 'Sending…' : 'Send enquiry'}
-            </button>
-            <button type="button" className="btn btn-secondary" onClick={restart} disabled={submitting}>
-              Start again
-            </button>
+          <div>
+            <label htmlFor="enq-email" className="label">Your email</label>
+            <input id="enq-email" type="email" inputMode="email" autoComplete="email" className="field" value={email}
+              onChange={(e) => { setEmail(e.target.value); setConfirming(false) }} maxLength={254}
+              aria-invalid={!!errors.email} aria-describedby={errors.email ? 'enq-email-err' : 'enq-email-hint'} />
+            {errors.email
+              ? <p id="enq-email-err" className="mt-1 text-sm text-danger">{errors.email}</p>
+              : <p id="enq-email-hint" className="hint mt-1">For your reference ID and status updates only.</p>}
           </div>
+          {submitError && <p role="alert" className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{submitError}</p>}
+          {confirming ? (
+            <EmailConfirm
+              email={normaliseEmail(email)}
+              question={CONFIRM_EMAIL_TEXT}
+              hint={emailTypoHint(email)}
+              busy={submitting}
+              onYes={onConfirmed}
+              onChange={() => { setConfirming(false); requestAnimationFrame(() => document.getElementById('enq-email')?.focus()) }}
+            />
+          ) : (
+            <div className="flex flex-wrap items-center gap-3">
+              <button type="submit" className="btn btn-primary" disabled={submitting}>
+                Send enquiry
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={restart} disabled={submitting}>
+                Start again
+              </button>
+            </div>
+          )}
           <p className="hint">
-            Your name, booking ID and description are shared with the hotel’s lost property team only, and deleted
-            after the enquiry is closed.
+            Your name, booking ID, email and description are shared with the hotel’s lost property team only, and
+            deleted after the report is closed.
           </p>
         </form>
       )}

@@ -4,9 +4,10 @@ import Brand from '@/components/foundora/Brand'
 import ThemeToggle from '@/components/foundora/Theme'
 import TrackEnquiry from '@/components/enquiry/TrackEnquiry'
 
-export const metadata: Metadata = { title: 'Check an enquiry — Foundora' }
+export const metadata: Metadata = { title: 'Check a report — Foundora' }
 
-// Public: the reference alone shows nothing; the booking ID must match too.
+// Public: the reference alone shows nothing; it needs the booking ID too, or
+// the private tracking link's token (read in the browser from after '#').
 export default async function TrackPage({
   searchParams,
 }: {
@@ -38,10 +39,10 @@ export default async function TrackPage({
         </div>
       </header>
       <main className="mx-auto max-w-4xl px-5 py-8 sm:px-8 sm:py-12">
-        <h1 className="text-3xl font-bold tracking-tight">Check an enquiry</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Check a report</h1>
         <p className="mt-2 max-w-prose text-muted">
-          Enter the reference you were given and your booking ID to see updates
-          and reply to the hotel team.
+          Open the private tracking link you were given, or enter your reference
+          and booking ID, to see updates and reply to the hotel team.
         </p>
         <div className="mt-6">
           <TrackEnquiry initialRef={initialRef} />

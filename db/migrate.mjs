@@ -32,11 +32,14 @@ const sha256 = (s) => createHash('sha256').update(s).digest('hex')
 export class MigrationError extends Error {}
 
 // Statement-level destructive SQL, ignoring comments and function bodies ($$...$$).
+// ALTER COLUMN … DROP NOT NULL / DROP DEFAULT only relax a rule (no data can be
+// lost), so they are not counted; anything else with DROP or RENAME still is.
 export function destructiveStatements(sql) {
   const stripped = sql
     .replace(/(\$[A-Za-z_]*\$)[\s\S]*?\1/g, ' ')
     .replace(/--.*$/gm, ' ')
     .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/\balter\s+column\s+("[^"]+"|\w+)\s+drop\s+(not\s+null|default)\b/gi, 'alter column $1 relax $2')
   const re = /\b(drop\s+(table|column|schema|type|view|materialized\s+view|function|trigger|policy|index|sequence|extension)|truncate|delete\s+from|alter\s+table[^;]*\b(drop|rename)\b|alter\s+\w+[^;]*\brename\b)[^;]*/gi
   return [...stripped.matchAll(re)].map((m) => m[0].replace(/\s+/g, ' ').trim().slice(0, 120))
 }

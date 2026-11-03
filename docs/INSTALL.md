@@ -117,6 +117,10 @@ Run on a phone, on the environment's address. Made-up data only on staging.
 - [ ] Log item in a public area → only active areas are suggested; a retired room is refused
 - [ ] store it, match a guest, record a handover
 - [ ] guest page: send an enquiry → reference; `/track` shows it; staff reply → customer sees it
+- [ ] lost report in the chat: an email is asked for; "Is this your correct email address?…" appears; "No, change it" goes back; "Yes, send" shows the reference and a private tracking link
+- [ ] "Hand in a found item": short form, asks where the item is now, tells the finder to hand it in at reception
+- [ ] the tracking link opens the report on another phone without a booking ID; shows hotel, reference, status and messages, never the email or booking ID; a changed link says "not valid or has expired"
+- [ ] staff: the found report shows "Found item report", the finder's email, no possible matches, and "Resolve — item received"
 - [ ] `/track` with a wrong reference 61 times in an hour → "Too many checks from your connection"; another network (mobile data) still works
 
 **Deploy safety**

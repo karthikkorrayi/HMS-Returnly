@@ -19,7 +19,7 @@ import {
 
 export type RequestListRow = Pick<
   CustomerRequest,
-  'id' | 'reference' | 'customer_name' | 'booking_ref' | 'item_name' | 'category' | 'status' | 'assigned_to' | 'created_at'
+  'id' | 'reference' | 'report_type' | 'customer_name' | 'booking_ref' | 'item_name' | 'category' | 'status' | 'assigned_to' | 'created_at'
 >
 
 export type RequestListQuery = {
@@ -36,7 +36,7 @@ export function cleanRequestSearch(raw: unknown): string {
   return (typeof raw === 'string' ? raw : '').replace(/[^A-Za-z0-9 -]/g, '').trim().slice(0, 40)
 }
 
-const FIELDS = `r.id, r.reference, r.customer_name, r.booking_ref, r.item_name, r.category, r.status::text as status,
+const FIELDS = `r.id, r.reference, r.report_type, r.customer_name, r.booking_ref, r.item_name, r.category, r.status::text as status,
   r.assigned_to, r.created_at`
 
 export async function loadRequestList(tx: Tx, q: RequestListQuery) {
@@ -96,7 +96,7 @@ export async function loadRequestDetail(tx: Tx, id: string): Promise<RequestDeta
   if (!UUID.test(id)) return null
   const req = (
     await tx.query<CustomerRequest>(
-      `select id, reference, customer_name, booking_ref, item_name, category, colour, brand, description,
+      `select id, reference, report_type, customer_name, booking_ref, customer_email, found_whereabouts, item_name, category, colour, brand, description,
               lost_location, lost_date, status::text as status, assigned_to, approved_item_id, decision_note,
               created_at, updated_at, closed_at
          from public.customer_requests where id = $1`,
