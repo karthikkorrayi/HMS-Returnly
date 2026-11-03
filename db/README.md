@@ -15,6 +15,7 @@ Everything about HMS Returnly's database: plain PostgreSQL 17+ (Railway runs 18;
 | `migrations/20261030000013_public_contacts.sql` | **Railway only.** `public_hotel_contacts()`: the hotel's phone, email, support hours and note for guests (no sign-in) | `app_owner` | after 012 |
 | `migrations/20261101000014_daily_cleanup.sql` | **Railway only.** `run_daily_cleanup()` (replaces `pg_cron`: expired stays, closed enquiries past retention, expired sign-in records; never lost items), owner-only; every run recorded in `ops.job_runs`; `last_cleanup()` for managers. Run nightly by `scripts/daily-cleanup.mjs` (Railway cron service) | `app_owner` | after 013 |
 | `migrations/20261103000015_public_rate_limits.sql` | **Railway only.** Per-visitor limits on the public pages (`hit_rate_limit()`, anon): 10 enquiries, 60 status checks, 30 replies per hour. Stores only a keyed hash of the visitor (never an IP) in `ops.rate_hits`; `run_daily_cleanup()` replaced to also remove windows older than a day | `app_owner` | after 014 |
+| `migrations/20261103000016_reports_email_tracking.sql` | **Railway only.** Lost **and found** reports (`report_type`), the customer's confirmed email, and tracking links: `submit_customer_report()` returns the reference and a one-time token (only its SHA-256 is stored); `customer_report_status()` / `customer_report_reply()` accept reference + token while the report is open and for 30 days after it closes. `customer_name`/`booking_ref` optional for found reports only | `app_owner` | after 015 |
 | `migrate.mjs` | The runner: applies `migrations/` in order, one transaction per file, recording each file's SHA-256 in `ops.schema_migrations` | `app_owner` via `MIGRATION_DATABASE_URL` | every deploy (Phase 7 pre-deploy step) |
 
 A change to the database is always a **new** migration file (additive: add tables, columns,
@@ -47,7 +48,8 @@ MIGRATION_DATABASE_URL=… npm run db:migrate -- --apply    # apply them
 The runner stops **before changing anything** if it is connected as anything other than `app_owner`
 (a superuser would end up owning the tables), if the bootstrap has not been run, if an applied file was
 edited or removed, if a new file sorts before one already applied, or if another run holds the lock.
-Files with statement-level `DROP`, `TRUNCATE`, `DELETE` or `RENAME` also need `--allow-destructive`.
+Files with statement-level `DROP`, `TRUNCATE`, `DELETE` or `RENAME` also need `--allow-destructive`
+(except `ALTER COLUMN … DROP NOT NULL` / `DROP DEFAULT`, which only relax a rule).
 A file that fails is rolled back and not recorded. Applied files are never edited: fix forward with a new file.
 
 ## App code: src/lib/db

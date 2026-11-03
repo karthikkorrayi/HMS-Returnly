@@ -2,7 +2,7 @@
 //
 // This is the seam for a future chatbot: an AI-backed assistant would
 // implement the same EnquiryAssistant interface (start / respond) and must
-// still end in an EnquiryPayload the customer reviews before sending. It must
+// still end in a ReportPayload (types.ts) the customer reviews before sending. It must
 // never see item records — matching happens server-side, for staff only.
 
 import { CATEGORIES } from '@/lib/types'

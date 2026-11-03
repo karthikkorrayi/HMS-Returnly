@@ -112,6 +112,11 @@ export default function GuestHome() {
               <span>Check an enquiry</span>
               <ReturnlyIcon name="arrow" className="action-arrow" />
             </Link>
+            <Link href={hotel ? `/found?hotel=${encodeURIComponent(hotel.inn_code)}` : '/found'} className="guest-action">
+              <ReturnlyIcon name="box" />
+              <span>Hand in a found item</span>
+              <ReturnlyIcon name="arrow" className="action-arrow" />
+            </Link>
             <div className="guest-trust">
               <ReturnlyIcon name="shield" />
               <p>

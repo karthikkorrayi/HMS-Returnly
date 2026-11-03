@@ -16,7 +16,7 @@ const PAGE_SIZE = 20
 
 type Row = Pick<
   CustomerRequest,
-  'id' | 'reference' | 'customer_name' | 'booking_ref' | 'item_name' | 'category' | 'status' | 'assigned_to' | 'created_at'
+  'id' | 'reference' | 'report_type' | 'customer_name' | 'booking_ref' | 'item_name' | 'category' | 'status' | 'assigned_to' | 'created_at'
 >
 
 export type ListParams = { status?: string; q?: string; assigned?: string; p?: string }
@@ -163,7 +163,7 @@ export default async function RequestList({
                     {r.category ? <span className="text-muted"> · {CATEGORY_LABEL[r.category]}</span> : null}
                   </p>
                   <p className="hint truncate">
-                    {r.customer_name} · Booking {r.booking_ref} · {formatDateTime(r.created_at)}
+                    {r.report_type === 'found' ? 'Found item report' : `${r.customer_name} · Booking ${r.booking_ref}`} · {formatDateTime(r.created_at)}
                   </p>
                 </div>
                 <p className="text-sm text-muted sm:text-right">
