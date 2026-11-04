@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { requireSession } from '@/lib/auth'
+import { staffPath } from '@/lib/staff-paths'
 import { withStaff } from '@/lib/db'
 import { loadAreas, loadStorage } from '@/lib/hotel-config'
 import InlineAction from '@/components/InlineAction'
@@ -8,13 +9,13 @@ import {
 } from '../config-actions'
 
 export default async function PlacesPage() {
-  const { staff } = await requireSession(['manager'])
+  const { staff, property } = await requireSession(['manager'])
   const { areas, storage } = await withStaff(staff.user_id, async (tx) => ({ areas: await loadAreas(tx), storage: await loadStorage(tx) }))
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
       <div>
-        <Link href="/settings" className="text-sm font-semibold text-teal">← Settings</Link>
+        <Link href={staffPath(property.slug, '/settings')} className="text-sm font-semibold text-teal">← Settings</Link>
         <h1 className="mt-2 text-2xl font-bold">Areas and storage places</h1>
         <p className="hint mt-1">Retired entries are kept for history but no longer offered to staff.</p>
       </div>

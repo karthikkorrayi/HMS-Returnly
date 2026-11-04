@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { requireSession } from '@/lib/auth'
+import { staffPath } from '@/lib/staff-paths'
 import { withStaff } from '@/lib/db'
 import { loadFloors, type RoomRow } from '@/lib/hotel-config'
 import InlineAction from '@/components/InlineAction'
@@ -23,7 +24,7 @@ function Rooms({ rooms }: { rooms: RoomRow[] }) {
 }
 
 export default async function RoomsPage() {
-  const { staff } = await requireSession(['manager'])
+  const { staff, property } = await requireSession(['manager'])
   const { floors, unassigned } = await withStaff(staff.user_id, loadFloors)
   const total = floors.reduce((n, f) => n + f.rooms.length, 0) + unassigned.length
   const retired = [...floors.flatMap((f) => f.rooms), ...unassigned].filter((r) => !r.active).length
@@ -31,7 +32,7 @@ export default async function RoomsPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-5">
       <div>
-        <Link href="/settings" className="text-sm font-semibold text-teal">← Settings</Link>
+        <Link href={staffPath(property.slug, '/settings')} className="text-sm font-semibold text-teal">← Settings</Link>
         <h1 className="mt-2 text-2xl font-bold">Floors and rooms</h1>
         <p className="hint mt-1">
           {floors.length} floor{floors.length === 1 ? '' : 's'} · {total} room{total === 1 ? '' : 's'}{retired ? ` (${retired} retired)` : ''}.

@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { requireSession } from '@/lib/auth'
+import { staffPath } from '@/lib/staff-paths'
 import { withStaff } from '@/lib/db'
 import { EMAIL_STATUS_LABEL, EMAIL_TEMPLATE_LABEL, loadEmailLog, maskEmail } from '@/lib/email-log'
 import { formatDateTime } from '@/lib/format'
@@ -7,14 +8,14 @@ import { formatDateTime } from '@/lib/format'
 // Managers: what was emailed to customers, and whether it went. The copy shown
 // is exactly what the customer received, with the private link blanked out.
 export default async function EmailsPage() {
-  const { staff } = await requireSession(['manager'])
+  const { staff, property } = await requireSession(['manager'])
   const rows = await withStaff(staff.user_id, (tx) => loadEmailLog(tx, 50))
   const tone = (s: string) =>
     s === 'sent' ? 'bg-done-soft text-done' : s === 'failed' ? 'bg-danger-soft text-danger' : ['retry', 'queued', 'sending'].includes(s) ? 'bg-attention-soft text-attention' : 'bg-paper text-muted'
 
   return (
     <div className="mx-auto max-w-2xl space-y-5">
-      <Link href="/settings" className="text-sm font-semibold text-teal">← Settings</Link>
+      <Link href={staffPath(property.slug, '/settings')} className="text-sm font-semibold text-teal">← Settings</Link>
       <div>
         <h1 className="text-2xl font-bold">Customer emails</h1>
         <p className="hint mt-1">The last 50 emails to customers about this hotel’s reports. Sent from Foundora’s address with your hotel’s name. Private links are hidden here.</p>

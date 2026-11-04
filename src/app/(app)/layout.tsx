@@ -4,6 +4,8 @@ import { ROLE_LABEL } from '@/lib/types'
 import Brand from '@/components/foundora/Brand'
 import ThemeToggle from '@/components/foundora/Theme'
 import NotificationBell from '@/components/NotificationBell'
+import { StaffHotelProvider } from '@/components/StaffHotel'
+import { staffPath } from '@/lib/staff-paths'
 import { withStaff } from '@/lib/db'
 import { NOTIFIED_ROLES, unreadCount } from '@/lib/notifications'
 import { signOut } from './actions'
@@ -21,10 +23,11 @@ export default async function AppLayout({
   const unread = notified ? await withStaff(staff.user_id, unreadCount).catch(() => 0) : 0
 
   return (
+    <StaffHotelProvider slug={property.slug}>
     <div className="overview-shell min-h-screen md:grid md:grid-cols-[15rem_minmax(0,1fr)]">
       <aside className="hidden border-r border-line bg-surface p-5 md:sticky md:top-0 md:flex md:h-screen md:flex-col md:gap-7">
         <div>
-          <Link href={homeFor(staff.role)} className="flex items-center gap-3">
+          <Link href={homeFor(staff.role, property.slug)} className="flex items-center gap-3">
             <Brand />
           </Link>
           <div className="mt-6 flex items-start justify-between gap-2 rounded-xl bg-paper p-3">
@@ -42,7 +45,7 @@ export default async function AppLayout({
           <p className="font-semibold">{staff.display_name}</p>
           <p className="hint mt-1">{ROLE_LABEL[staff.role]}</p>
           <Link
-            href="/account"
+            href={staffPath(property.slug, '/account')}
             className="mt-2 block text-xs font-semibold text-teal"
           >
             Change password
@@ -67,13 +70,13 @@ export default async function AppLayout({
           <div className="flex min-w-0 items-center gap-3">
             <Link
               className="staff-mobile-brand"
-              href={homeFor(staff.role)}
+              href={homeFor(staff.role, property.slug)}
               aria-label="Foundora workspace"
             >
               <Brand />
             </Link>
             <Link
-              href="/account"
+              href={staffPath(property.slug, '/account')}
               className="min-w-0"
               aria-label="Your account and password"
             >
@@ -103,5 +106,6 @@ export default async function AppLayout({
         <Nav role={staff.role} variant="bar" />
       </div>
     </div>
+    </StaffHotelProvider>
   )
 }

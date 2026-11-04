@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import EnquiryChat from '@/components/enquiry/EnquiryChat'
+import { isStaffPage } from '@/lib/staff-paths'
 import type { PublicContact } from '@/lib/hotel-config'
 import {
   detectSupportTopic,
@@ -22,6 +23,7 @@ type Experience = {
   openEnquiry: () => void
 }
 const GuestContext = createContext<Experience | null>(null)
+
 export function useGuestExperience() {
   const value = useContext(GuestContext)
   if (!value) throw new Error('Guest experience provider is missing.')
@@ -144,10 +146,13 @@ export default function GuestExperience({
       }}
     >
       {children}
+      {/* Guests only: on staff pages (and staff sign-in) the button covered the
+          bottom menu on phones, and staff have no use for the guest guide. */}
+      {!isStaffPage(path) && (<>
       <button
         ref={launcher}
         type="button"
-        className={`support-launcher ${/^\/(items|staff|settings|requests|support|account)(\/|$)/.test(path) ? 'support-staff' : ''}`}
+        className="support-launcher"
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls="foundora-support"
@@ -334,6 +339,7 @@ export default function GuestExperience({
           )}
         </div>
       </dialog>
+      </>)}
     </GuestContext.Provider>
   )
 }

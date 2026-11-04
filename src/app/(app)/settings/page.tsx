@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { requireSession } from '@/lib/auth'
+import { staffPath } from '@/lib/staff-paths'
 import { withStaff } from '@/lib/db'
 import { loadAreas, loadFloors, loadHotelDetails, loadStorage } from '@/lib/hotel-config'
 import { cleanupStatus, loadLastCleanup } from '@/lib/daily-cleanup'
@@ -78,14 +79,14 @@ export default async function SettingsPage() {
       <section className="panel p-4 sm:p-5">
         <h2 className="mb-3 text-lg font-semibold">Hotel layout</h2>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Link href="/settings/rooms" className="flex items-center justify-between rounded-xl bg-paper p-4 hover:bg-teal-soft">
+          <Link href={staffPath(property.slug, '/settings/rooms')} className="flex items-center justify-between rounded-xl bg-paper p-4 hover:bg-teal-soft">
             <span>
               <span className="block font-semibold">Floors and rooms</span>
               <span className="hint">{floors.floors.length} floor{floors.floors.length === 1 ? '' : 's'} · {rooms} room{rooms === 1 ? '' : 's'} in use</span>
             </span>
             <ReturnlyIcon name="arrow" />
           </Link>
-          <Link href="/settings/places" className="flex items-center justify-between rounded-xl bg-paper p-4 hover:bg-teal-soft">
+          <Link href={staffPath(property.slug, '/settings/places')} className="flex items-center justify-between rounded-xl bg-paper p-4 hover:bg-teal-soft">
             <span>
               <span className="block font-semibold">Areas and storage places</span>
               <span className="hint">
@@ -94,14 +95,21 @@ export default async function SettingsPage() {
             </span>
             <ReturnlyIcon name="arrow" />
           </Link>
-          <Link href="/settings/branding" className="flex items-center justify-between rounded-xl bg-paper p-4 hover:bg-teal-soft">
+          <Link href={staffPath(property.slug, '/settings/branding')} className="flex items-center justify-between rounded-xl bg-paper p-4 hover:bg-teal-soft">
             <span>
               <span className="block font-semibold">Branding</span>
               <span className="hint">Logo, email colour, welcome line and your guest page address</span>
             </span>
             <ReturnlyIcon name="arrow" />
           </Link>
-          <Link href="/settings/emails" className="flex items-center justify-between rounded-xl bg-paper p-4 hover:bg-teal-soft">
+          <Link href={staffPath(property.slug, '/settings/access-log')} className="flex items-center justify-between rounded-xl bg-paper p-4 hover:bg-teal-soft">
+            <span>
+              <span className="block font-semibold">Access log</span>
+              <span className="hint">Who opened which customer report, and when</span>
+            </span>
+            <ReturnlyIcon name="arrow" />
+          </Link>
+          <Link href={staffPath(property.slug, '/settings/emails')} className="flex items-center justify-between rounded-xl bg-paper p-4 hover:bg-teal-soft">
             <span>
               <span className="block font-semibold">Customer emails</span>
               <span className="hint">What was emailed to customers, and whether it went</span>

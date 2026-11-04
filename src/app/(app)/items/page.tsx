@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { ITEM_ROLES, requireSession } from '@/lib/auth'
+import { staffPath } from '@/lib/staff-paths'
 import { withStaff } from '@/lib/db'
 import { hotelToday } from '@/lib/format'
 import { CATEGORY_LABEL } from '@/lib/types'
@@ -52,7 +53,7 @@ export default async function ItemsPage({
     const next = new URLSearchParams({ view: selectedView.id })
     if (q) next.set('q', q)
     if (lastPage > 1) next.set('p', String(lastPage))
-    redirect(`/items?${next.toString()}`)
+    redirect(staffPath(property.slug, `/items?${next.toString()}`))
   }
 
   const records = result?.rows ?? []

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { unreadNotificationCount } from '@/app/(app)/notifications/actions'
+import { useStaffPath } from '@/components/StaffHotel'
 
 // The bell with the unread count. Starts from the count the server rendered,
 // then checks again every 60 seconds while the tab is visible, when the tab
@@ -15,6 +16,7 @@ export default function NotificationBell({ initial }: { initial: number }) {
   const [count, setCount] = useState(initial)
   const pathname = usePathname()
   const ref = useRef<HTMLAnchorElement>(null)
+  const to = useStaffPath()
 
   useEffect(() => {
     let live = true
@@ -34,7 +36,7 @@ export default function NotificationBell({ initial }: { initial: number }) {
 
   const label = count ? `Notifications: ${count} unread` : 'Notifications'
   return (
-    <Link ref={ref} href="/notifications" aria-label={label} title={label}
+    <Link ref={ref} href={to('/notifications')} aria-label={label} title={label}
       className="relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-line bg-surface text-ink hover:bg-teal-soft">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7"
         strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

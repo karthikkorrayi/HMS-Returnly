@@ -223,18 +223,33 @@ EMAIL_ALLOWLIST=<your own test addresses, comma-separated>
 - Same `app_owner` trade-off as `daily-cleanup`; a dedicated role with only
   the sending rights is the planned improvement.
 
-### Hotel addresses and logos (PR E)
+### Addresses (decided 2026-11-04: paths only, one domain)
 
-- Each hotel's guest page is `https://<domain>/h/<slug>` (set on Settings →
-  Branding). No DNS or Railway change per hotel.
-- Later, `<slug>.foundora.co.uk`: wildcard DNS `*` CNAME in Cloudflare (DNS
-  only), a wildcard custom domain on `web` (one of the plan's custom domains;
-  needs the TXT verification record), and `HOTEL_SUBDOMAIN_BASE=foundora.co.uk`
-  on `web`. The code (`src/lib/hotel-resolve.ts`) already understands both;
-  until the variable is set, hosts are ignored.
+All on one domain (later `hotel.foundora.co.uk`; for now the Railway address):
+
+| Address | What |
+|---|---|
+| `/` | Foundora's home page (guest page for now; Foundora's own page later) |
+| `/h/<code>` | a hotel's guest page |
+| `/h/<code>/login` | that hotel's staff sign-in: only its own staff can sign in there |
+| `/h/<code>/<module>` | its staff pages (`items`, `requests`, `staff`, `settings`, `support`, `account`, `notifications`) |
+| `/login` | "Enter your hotel code" → `/h/<code>/login` (straight there when there is one hotel) |
+| `/brand/<code>/logo` | the hotel's logo (public) |
+
+- The address only chooses the page and branding. Access is decided by the
+  session (which hotel the signed-in person belongs to) and by the database's
+  row-level security. `src/proxy.ts` maps `/h/<code>/<module>` onto the page
+  and tells it which hotel the address named; `requireSession()` sends anyone
+  whose hotel differs to the same page at their own hotel. Old `/items`-style
+  bookmarks are moved to the hotel's address the same way.
+- No DNS or Railway change per hotel. Subdomains (`<code>.foundora.co.uk`)
+  are not planned; `src/lib/hotel-resolve.ts` can read them but nothing sets
+  `HOTEL_SUBDOMAIN_BASE`.
+- Moving to `hotel.foundora.co.uk` (Phase 8): Cloudflare CNAME `hotel` →
+  Railway (DNS only), custom domain on `web`, then `BETTER_AUTH_URL` and
+  `email-dispatch`'s `PUBLIC_BASE_URL` to `https://hotel.foundora.co.uk`.
 - Logos are stored in the `photos` bucket under `<property>/brand/` and served
-  publicly by the app at `/brand/<slug>/logo` (guest pages and emails need
-  them). Item photos are never served there.
+  publicly by the app at `/brand/<code>/logo`. Item photos are never served there.
 
 ## First-time setup (once per environment)
 

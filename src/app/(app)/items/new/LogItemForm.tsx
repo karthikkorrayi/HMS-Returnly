@@ -6,6 +6,7 @@ import { MAX_PHOTOS, uploadItemPhotos } from '@/lib/photos'
 import { saveItem } from './actions'
 import { CATEGORIES, TIER_HINT, TIER_LABEL, type ValueTier } from '@/lib/types'
 import PhotoPicker from '@/components/PhotoPicker'
+import { useStaffPath } from '@/components/StaffHotel'
 
 function localNowForInput() {
   const d = new Date()
@@ -26,6 +27,7 @@ export default function LogItemForm({
   roomCheckId?: string
 }) {
   const router = useRouter()
+  const to = useStaffPath()
   const roomSet = useMemo(() => new Set(rooms.map((r) => r.toUpperCase())), [rooms])
   const maxFoundAt = useMemo(() => localNowForInput(), [])
 
@@ -87,7 +89,7 @@ export default function LogItemForm({
       if (failed > 0) photoNote = `&photos_failed=${failed}`
     }
 
-    router.push(`/items/${item.id}?logged=1${photoNote}`)
+    router.push(to(`/items/${item.id}?logged=1${photoNote}`))
     router.refresh()
   }
 
