@@ -153,8 +153,8 @@ under Settings → "How long records are kept", with a warning after 36 hours.
 | Source | the same repository and branch as `web` |
 | Wait for CI | **on** |
 | Region | EU West |
-| Build command | default |
-| Start command | `node scripts/daily-cleanup.mjs` |
+| Build command | `echo "Scheduled job: no website build needed"` (set 2026-11-03: the job needs the packages, not the website; halves the build and removes a way to fail) |
+| Start command | `node scripts/daily-cleanup.mjs` (must be set: without it Railway runs `npm run start`, a second website) |
 | Pre-deploy command | **none** (only `web` migrates) |
 | Cron schedule | `30 3 * * *` (03:30 UTC = 03:30 in winter / 04:30 in summer, UK) |
 | Health check | none (it is not a web server) |
@@ -191,7 +191,8 @@ log under Settings → Customer emails.
 | Setting | Value |
 |---|---|
 | Source | same repository and branch as `web` (Wait for CI on), EU West |
-| Start command | `node scripts/email-dispatch.mjs` |
+| Build command | `echo "Scheduled job: no website build needed"` |
+| Start command | `node scripts/email-dispatch.mjs` (must be set, see daily-cleanup) |
 | Pre-deploy command | **none** |
 | Cron schedule | `*/5 * * * *` (every 5 minutes; Railway's minimum) |
 | Health check / domain / restart | none / none / never |

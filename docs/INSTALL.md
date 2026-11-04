@@ -133,6 +133,11 @@ Run on a phone, on the environment's address. Made-up data only on staging.
 - [ ] staff ask a question / send a message / resolve → one email each; the email says there is a message, without its text
 - [ ] reply to the email → Zoho's auto-reply comes back
 
+**Staff notifications**
+- [ ] a guest sends a report → within a minute the manager's bell shows 1; Notifications lists "New lost item report LF-… · item"; opening it goes to the report and the count drops
+- [ ] assign the report to a Support member → their bell shows "Assigned to you"; the guest replies via the link → both the manager and that Support member are told
+- [ ] housekeeping and front office see no bell; another hotel's manager sees nothing
+
 **Daily clean-up**
 - [ ] daily-cleanup run by hand → log ends `✓ done`; Settings shows "Last ran less than an hour ago"
 - [ ] the next morning: a scheduled run is in its log (03:30 UTC)
