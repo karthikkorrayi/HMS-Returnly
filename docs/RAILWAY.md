@@ -223,6 +223,19 @@ EMAIL_ALLOWLIST=<your own test addresses, comma-separated>
 - Same `app_owner` trade-off as `daily-cleanup`; a dedicated role with only
   the sending rights is the planned improvement.
 
+### Hotel addresses and logos (PR E)
+
+- Each hotel's guest page is `https://<domain>/h/<slug>` (set on Settings →
+  Branding). No DNS or Railway change per hotel.
+- Later, `<slug>.foundora.co.uk`: wildcard DNS `*` CNAME in Cloudflare (DNS
+  only), a wildcard custom domain on `web` (one of the plan's custom domains;
+  needs the TXT verification record), and `HOTEL_SUBDOMAIN_BASE=foundora.co.uk`
+  on `web`. The code (`src/lib/hotel-resolve.ts`) already understands both;
+  until the variable is set, hosts are ignored.
+- Logos are stored in the `photos` bucket under `<property>/brand/` and served
+  publicly by the app at `/brand/<slug>/logo` (guest pages and emails need
+  them). Item photos are never served there.
+
 ## First-time setup (once per environment)
 
 The full install, a local rehearsal, the after-install checklist and how to

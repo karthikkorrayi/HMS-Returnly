@@ -69,7 +69,8 @@ function wording(t, found, hotel, ref) {
  * @param {{ template: string, reportType: 'lost'|'found', reference: string, itemName: string,
  *           createdAt: string, trackUrl: string,
  *           hotel: { name: string, contactEmail?: string|null, contactPhone?: string|null,
- *                    supportHours?: string|null, logoUrl?: string|null, colour?: string|null } }} d
+ *                    supportHours?: string|null, logoUrl?: string|null, colour?: string|null,
+ *                    intro?: string|null } }} d
  * @returns {{ subject: string, html: string, text: string }}
  */
 export function renderEmail(d) {
@@ -77,6 +78,11 @@ export function renderEmail(d) {
   const found = d.reportType === 'found'
   const hotel = d.hotel.name
   const w = wording(d.template, found, hotel, d.reference)
+  // The hotel's own welcome line (plain text, set on Settings → Branding), in
+  // the first email only.
+  const intro = d.template === 'received' && typeof d.hotel.intro === 'string' && d.hotel.intro.trim()
+    ? d.hotel.intro.trim().slice(0, 300) : null
+  if (intro) w.lines = [intro, ...w.lines]
   const status = STATUS_LABEL[d.template]
   const colour = colourOf(d.hotel.colour)
   const contact = [d.hotel.contactPhone, d.hotel.contactEmail, d.hotel.supportHours].filter(Boolean)

@@ -138,6 +138,12 @@ Run on a phone, on the environment's address. Made-up data only on staging.
 - [ ] assign the report to a Support member → their bell shows "Assigned to you"; the guest replies via the link → both the manager and that Support member are told
 - [ ] housekeeping and front office see no bell; another hotel's manager sees nothing
 
+**Branding and hotel address**
+- [ ] Settings → Branding: upload a logo (PNG from the phone) → it shows on the page, on `/h/<address>` and in the next customer email
+- [ ] set an email colour; a very light one is refused; a welcome line appears in the next "report received" email
+- [ ] `/h/<address>` opens the guest page with the hotel already chosen; "Hand in a found item" there has the hotel chosen too
+- [ ] change the address → the old `/h/…` shows "not found"; tracking links in earlier emails still work
+
 **Daily clean-up**
 - [ ] daily-cleanup run by hand → log ends `✓ done`; Settings shows "Last ran less than an hour ago"
 - [ ] the next morning: a scheduled run is in its log (03:30 UTC)

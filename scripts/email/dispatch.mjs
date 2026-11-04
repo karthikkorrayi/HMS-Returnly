@@ -65,11 +65,16 @@ export async function dispatch(db, opts) {
   for (const row of rows) {
     const r = (await db.query(
       `select r.reference, r.report_type, r.item_name, r.created_at, r.status,
-              p.name, p.contact_email, p.contact_phone, p.support_hours
+              p.name, p.contact_email, p.contact_phone, p.support_hours, p.slug, p.brand_colour, p.brand_intro,
+              p.logo_key, p.logo_version
          from public.customer_requests r join public.properties p on p.id = r.property_id
         where r.id = $1`, [row.request_id])).rows[0]
     if (!r) continue // report deleted meanwhile: the row went with it
-    const hotel = { name: r.name, contactEmail: r.contact_email, contactPhone: r.contact_phone, supportHours: r.support_hours }
+    // Branding (migration 019). The logo is linked, not attached; it is served
+    // by the app at /brand/<slug>/logo, so it only appears with an https address.
+    const hotel = { name: r.name, contactEmail: r.contact_email, contactPhone: r.contact_phone, supportHours: r.support_hours,
+      colour: r.brand_colour ?? null, intro: r.brand_intro ?? null,
+      logoUrl: r.logo_key && r.slug ? `${baseUrl}/brand/${encodeURIComponent(r.slug)}/logo?v=${r.logo_version}` : null }
     const base = { template: row.template, reportType: r.report_type, reference: r.reference, itemName: r.item_name,
       createdAt: new Date(r.created_at).toISOString(), hotel }
     const sender = `${r.name} via ${from.name} <${from.email}>`
