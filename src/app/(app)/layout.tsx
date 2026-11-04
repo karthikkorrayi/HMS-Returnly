@@ -3,6 +3,9 @@ import { homeFor, requireSession } from '@/lib/auth'
 import { ROLE_LABEL } from '@/lib/types'
 import Brand from '@/components/foundora/Brand'
 import ThemeToggle from '@/components/foundora/Theme'
+import NotificationBell from '@/components/NotificationBell'
+import { withStaff } from '@/lib/db'
+import { NOTIFIED_ROLES, unreadCount } from '@/lib/notifications'
 import { signOut } from './actions'
 import Nav from './Nav'
 
@@ -12,6 +15,10 @@ export default async function AppLayout({
   children: React.ReactNode
 }) {
   const { staff, property } = await requireSession()
+  // Only managers and support staff get notifications. A failure here must
+  // never stop the page from loading: the bell just starts at 0.
+  const notified = NOTIFIED_ROLES.includes(staff.role)
+  const unread = notified ? await withStaff(staff.user_id, unreadCount).catch(() => 0) : 0
 
   return (
     <div className="overview-shell min-h-screen md:grid md:grid-cols-[15rem_minmax(0,1fr)]">
@@ -20,9 +27,12 @@ export default async function AppLayout({
           <Link href={homeFor(staff.role)} className="flex items-center gap-3">
             <Brand />
           </Link>
-          <div className="mt-6 rounded-xl bg-paper p-3">
-            <p className="font-semibold leading-tight">{property.name}</p>
-            <p className="hint mt-1">{property.inn_code}</p>
+          <div className="mt-6 flex items-start justify-between gap-2 rounded-xl bg-paper p-3">
+            <div className="min-w-0">
+              <p className="font-semibold leading-tight">{property.name}</p>
+              <p className="hint mt-1">{property.inn_code}</p>
+            </div>
+            {notified && <NotificationBell initial={unread} />}
           </div>
         </div>
 
@@ -76,7 +86,10 @@ export default async function AppLayout({
               </p>
             </Link>
           </div>
-          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            {notified && <NotificationBell initial={unread} />}
+            <ThemeToggle />
+          </div>
           <form action={signOut}>
             <button className="btn btn-secondary min-h-9 px-3 text-sm">
               Sign out
