@@ -13,7 +13,7 @@ import {
 } from '@/lib/guest-support'
 import ThemeToggle from './Theme'
 
-type Hotel = { inn_code: string; name: string }
+type Hotel = { inn_code: string; name: string; slug?: string; has_logo?: boolean; logo_version?: number }
 type Experience = {
   hotels: Hotel[]
   hotel: Hotel | null

@@ -53,7 +53,11 @@ const enquiry = (over = {}) => ({
 
 console.log('Public home page')
 const list = await A(hotels)
-check(list.length === 1 && list[0].inn_code === 'DEMO' && list[0].name === 'Demo Hotel' && Object.keys(list[0]).length === 2, 'lists hotels by code and name only', JSON.stringify(list))
+// Code, name and the public branding from migration 019; nothing else (no
+// file names, contact or internal data).
+check(list.length === 1 && list[0].inn_code === 'DEMO' && list[0].name === 'Demo Hotel'
+  && Object.keys(list[0]).sort().join() === 'brand_colour,has_logo,inn_code,logo_version,name,slug',
+  'lists hotels by code, name and public branding only', JSON.stringify(list))
 
 console.log('\nSubmitting an enquiry')
 const ref = await A((tx) => submitRequest(tx, enquiry()))

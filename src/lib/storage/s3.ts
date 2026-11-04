@@ -32,9 +32,14 @@ export type PhotoStore = {
   ensureBucket(): Promise<'created' | 'exists'>
 }
 
-// Keys are always {property_id}/{item_id}/{uuid}.jpg; refuse anything else so a
-// bug can never address another object or path.
-const KEY = /^[0-9a-f-]{36}\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.jpg$/
+// Keys are always {property_id}/{item_id}/{uuid}.jpg (item photos) or
+// {property_id}/brand/{uuid}.jpg (the hotel's logo, migration 019); refuse
+// anything else so a bug can never address another object or path.
+const KEY = /^[0-9a-f-]{36}\/([0-9a-f-]{36}|brand)\/[0-9a-f-]{36}\.jpg$/
+
+export function isStoreKey(key: string): boolean {
+  return KEY.test(key)
+}
 
 export function makeStore(cfg: StoreConfig): PhotoStore {
   if (!/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(cfg.bucket)) throw new StorageError('Invalid bucket name.')

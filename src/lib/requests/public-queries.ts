@@ -86,8 +86,11 @@ export async function reply(tx: Tx, reference: string, bookingRef: string, body:
   await tx.rpc('customer_reply', { p_reference: reference, p_booking_ref: bookingRef, p_body: body })
 }
 
-export async function hotels(tx: Tx): Promise<{ inn_code: string; name: string }[]> {
-  return (await tx.rpc<{ inn_code: string; name: string }>('public_properties')).rows
+export type PublicHotelRow = { inn_code: string; name: string; slug: string; brand_colour: string | null; has_logo: boolean; logo_version: number }
+
+/** The hotels with their public branding (migration 019; replaces public_properties for the app). */
+export async function hotels(tx: Tx): Promise<PublicHotelRow[]> {
+  return (await tx.rpc<PublicHotelRow>('public_hotels')).rows
 }
 
 /**

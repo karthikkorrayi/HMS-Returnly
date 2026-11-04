@@ -6,6 +6,7 @@ import Brand from './Brand'
 import ThemeToggle from './Theme'
 import { HotelContact, useGuestExperience } from './GuestExperience'
 import ReturnlyIcon from '@/components/ReturnlyIcon'
+import { logoPath } from '@/lib/branding-paths'
 
 export default function GuestHome() {
   const { hotels, hotel, contact, selectHotel, openEnquiry } =
@@ -41,7 +42,11 @@ export default function GuestHome() {
               </select>
             </div>
           ) : (
-            <span className="hotel-header-name">
+            <span className="hotel-header-name flex items-center gap-2">
+              {hotel?.has_logo && hotel.slug && (
+                // eslint-disable-next-line @next/next/no-img-element -- the hotel's own small logo, served by this app
+                <img src={logoPath(hotel.slug, hotel.logo_version ?? 0)} alt="" height={32} className="h-8 w-auto max-w-24 rounded object-contain" />
+              )}
               {hotel?.name ?? 'Hotel lost & found'}
             </span>
           )}
@@ -112,7 +117,7 @@ export default function GuestHome() {
               <span>Check an enquiry</span>
               <ReturnlyIcon name="arrow" className="action-arrow" />
             </Link>
-            <Link href={hotel ? `/found?hotel=${encodeURIComponent(hotel.inn_code)}` : '/found'} className="guest-action">
+            <Link href={hotel?.slug ? `/h/${hotel.slug}/found` : hotel ? `/found?hotel=${encodeURIComponent(hotel.inn_code)}` : '/found'} className="guest-action">
               <ReturnlyIcon name="box" />
               <span>Hand in a found item</span>
               <ReturnlyIcon name="arrow" className="action-arrow" />

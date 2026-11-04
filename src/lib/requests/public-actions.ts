@@ -16,7 +16,7 @@ import { headers } from 'next/headers'
 import { withAnon } from '@/lib/db'
 import { allow, clientIp, rateKey, TOO_MANY, type RateBucket } from '@/lib/rate-limit'
 import { isValidEmail, normaliseEmail } from './email'
-import { friendly, hotels, reply, reportReply, reportStatus, requestStatus, submitReport as insertReport } from './public-queries'
+import { friendly, hotels, type PublicHotelRow, reply, reportReply, reportStatus, requestStatus, submitReport as insertReport } from './public-queries'
 import type { CustomerStatusView, FoundWhereabouts, ReportPayload } from './types'
 
 const REF = /^LF-[0-9A-F]{5}-[0-9A-F]{5}$/
@@ -177,7 +177,7 @@ export async function replyByLink(reference: string, token: string, body: string
   return viewByLink(ref, t)
 }
 
-export async function listHotels(): Promise<{ inn_code: string; name: string }[]> {
+export async function listHotels(): Promise<PublicHotelRow[]> {
   try {
     return await withAnon(hotels)
   } catch (e) {

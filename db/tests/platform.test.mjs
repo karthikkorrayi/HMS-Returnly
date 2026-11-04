@@ -94,8 +94,9 @@ const anonFns = (await db.query(`select p.proname from pg_proc p join pg_namespa
 // The four customer functions, the hotel's public contact details (013), the
 // two the first-time setup screen needs before anyone can sign in (012), and
 // the per-visitor rate limit the public pages count before each action (015),
-// and the lost/found report with its tracking link (016).
-anonFns === 'complete_initial_setup,customer_reply,customer_report_reply,customer_report_status,customer_request_status,hit_rate_limit,public_hotel_contacts,public_properties,setup_status,submit_customer_report,submit_customer_request'
+// the lost/found report with its tracking link (016), and each hotel's public
+// branding and logo (019).
+anonFns === 'complete_initial_setup,customer_reply,customer_report_reply,customer_report_status,customer_request_status,hit_rate_limit,public_hotel_contacts,public_hotel_logo,public_hotels,public_properties,setup_status,submit_customer_report,submit_customer_request'
   ? pass('anon can call exactly the public report functions, the two setup functions and the rate limit') : fail('anon functions: ' + anonFns)
 
 const ownerOnly = (await db.query(`select has_function_privilege('authenticated', 'public.purge_closed_requests()', 'execute') a,

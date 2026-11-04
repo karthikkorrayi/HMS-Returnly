@@ -94,6 +94,13 @@ export default async function SettingsPage() {
             </span>
             <ReturnlyIcon name="arrow" />
           </Link>
+          <Link href="/settings/branding" className="flex items-center justify-between rounded-xl bg-paper p-4 hover:bg-teal-soft">
+            <span>
+              <span className="block font-semibold">Branding</span>
+              <span className="hint">Logo, email colour, welcome line and your guest page address</span>
+            </span>
+            <ReturnlyIcon name="arrow" />
+          </Link>
           <Link href="/settings/emails" className="flex items-center justify-between rounded-xl bg-paper p-4 hover:bg-teal-soft">
             <span>
               <span className="block font-semibold">Customer emails</span>
