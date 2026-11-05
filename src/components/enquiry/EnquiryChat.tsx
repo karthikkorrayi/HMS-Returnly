@@ -1,5 +1,7 @@
 'use client'
 
+import Typing from '@/components/foundora/Typing'
+import { notify } from '@/components/foundora/Toast'
 import { useEffect, useRef, useState } from 'react'
 import { ruleBasedAssistant, type ConversationState, type CustomerInput } from '@/lib/requests/assistant'
 import { submitReport } from '@/lib/requests/public-actions'
@@ -28,6 +30,15 @@ export default function EnquiryChat({ hotels, today }: { hotels: Hotel[]; today:
   const logRef = useRef<HTMLOListElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
+  const [thinking, setThinking] = useState(false)
+  const pending = useRef(false)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const checkpoints = useRef(new Map<number, { before: ConversationState; input: CustomerInput }>())
+  const [editBefore, setEditBefore] = useState<ConversationState | null>(null)
+  const [editing, setEditing] = useState<number | null>(null)
+  const [editText, setEditText] = useState('')
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
+
   // Keep the newest message visible by scrolling the conversation box only —
   // never the page, and not on first load.
   useEffect(() => {
@@ -35,15 +46,42 @@ export default function EnquiryChat({ hotels, today }: { hotels: Hotel[]; today:
     if (log && conv.messages.length > 2) log.scrollTop = log.scrollHeight
   }, [conv.messages.length])
 
-  function send(input: CustomerInput) {
-    setConv((c) => assistant.respond(c, input, today))
+  function send(input: CustomerInput, before = conv) {
+    if (pending.current) return
+    pending.current = true
+    setThinking(true)
+    setConfirming(false)
+    setSubmitError(null)
+    const next = assistant.respond(before, input, today)
+    const customer = next.messages[before.messages.length]
+    if (customer) {
+      for (const id of checkpoints.current.keys()) if (id >= customer.id) checkpoints.current.delete(id)
+      checkpoints.current.set(customer.id, { before, input })
+    }
+    // Show the submitted input immediately; reveal the actual state-machine result afterwards.
+    setConv({ ...before, messages: next.messages.slice(0, before.messages.length + 1) })
     setText('')
-    requestAnimationFrame(() => inputRef.current?.focus())
+    setEditing(null)
+    timer.current = setTimeout(() => {
+      setConv(next)
+      pending.current = false
+      setThinking(false)
+      inputRef.current?.focus()
+    }, 2400)
+  }
+
+  function saveEdit(id: number) {
+    const checkpoint = checkpoints.current.get(id)
+    if (!checkpoint || !editText.trim()) return
+    const input: CustomerInput = checkpoint.before.input === 'choices'
+      ? { kind: 'choice', value: editText, label: checkpoint.before.quickReplies.find((q) => q.value === editText)?.label ?? editText }
+      : { kind: 'text', text: editText }
+    send(input, checkpoint.before)
   }
 
   function onSend(e: React.FormEvent) {
     e.preventDefault()
-    if (conv.step === 'describe' && text.trim().length === 0) return
+    if (pending.current || editing !== null || (conv.step === 'describe' && text.trim().length === 0)) return
     send({ kind: 'text', text })
   }
 
@@ -54,6 +92,7 @@ export default function EnquiryChat({ hotels, today }: { hotels: Hotel[]; today:
   // Step 1: check the form, then ask the customer to confirm their email.
   function onSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (pending.current || submitting || editing !== null) return
     const next: Record<string, string> = {}
     if (!hotel) next.hotel = 'Choose the hotel you stayed at.'
     if (name.trim().length < 2) next.name = 'Enter your name as it appears on the booking.'
@@ -72,8 +111,10 @@ export default function EnquiryChat({ hotels, today }: { hotels: Hotel[]; today:
 
   // Step 2: the customer pressed "Yes, send" on the confirmation.
   async function onConfirmed() {
+    if (submitting || pending.current || editing !== null) return
     setSubmitting(true)
     setSubmitError(null)
+    try {
     const res = await submitReport({
       innCode: hotel,
       reportType: 'lost',
@@ -92,11 +133,18 @@ export default function EnquiryChat({ hotels, today }: { hotels: Hotel[]; today:
     })
     setSubmitting(false)
     setConfirming(false)
-    if (res.ok) setSent({ reference: res.reference, token: res.token })
-    else setSubmitError(res.error)
+    if (res.ok) { setSent({ reference: res.reference, token: res.token }); notify('success', 'Your enquiry has been sent to the hotel.') }
+    else { setSubmitError(res.error); notify('error', res.error) }
+    } catch { setSubmitError('Could not send your enquiry. Check your connection and try again.'); notify('error', 'Your enquiry could not be sent.') }
+    finally { setSubmitting(false); setConfirming(false) }
   }
 
   function restart() {
+    if (timer.current) clearTimeout(timer.current)
+    pending.current = false
+    setThinking(false)
+    setEditing(null)
+    checkpoints.current.clear()
     setConv(assistant.start(today))
     setSent(null)
     setConfirming(false)
@@ -116,12 +164,12 @@ export default function EnquiryChat({ hotels, today }: { hotels: Hotel[]; today:
 
   return (
     <div className="panel overflow-hidden">
-      <fieldset className={`grid gap-3 border-b border-line bg-paper p-4 sm:p-5 ${hotels.length > 1 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+      <fieldset disabled={submitting} className={`grid gap-3 border-b border-line bg-paper p-4 sm:p-5 ${hotels.length > 1 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
         <legend className="sr-only">Your booking</legend>
         {hotels.length > 1 ? (
           <div>
             <label htmlFor="enq-hotel" className="label">Hotel</label>
-            <select id="enq-hotel" className="field" value={hotel} onChange={(e) => setHotel(e.target.value)} aria-invalid={!!errors.hotel} aria-describedby={errors.hotel ? 'enq-hotel-err' : undefined}>
+            <select id="enq-hotel" className="field" value={hotel} onChange={(e) => { setHotel(e.target.value); setConfirming(false) }} aria-invalid={!!errors.hotel} aria-describedby={errors.hotel ? 'enq-hotel-err' : undefined}>
               <option value="">Choose…</option>
               {hotels.map((h) => <option key={h.inn_code} value={h.inn_code}>{h.name}</option>)}
             </select>
@@ -130,12 +178,12 @@ export default function EnquiryChat({ hotels, today }: { hotels: Hotel[]; today:
         ) : null}
         <div>
           <label htmlFor="enq-name" className="label">Your name</label>
-          <input id="enq-name" className="field" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} aria-invalid={!!errors.name} aria-describedby={errors.name ? 'enq-name-err' : undefined} />
+          <input id="enq-name" className="field" autoComplete="name" value={name} onChange={(e) => { setName(e.target.value); setConfirming(false) }} maxLength={80} aria-invalid={!!errors.name} aria-describedby={errors.name ? 'enq-name-err' : undefined} />
           {errors.name && <p id="enq-name-err" className="mt-1 text-sm text-danger">{errors.name}</p>}
         </div>
         <div>
           <label htmlFor="enq-booking" className="label">Booking ID</label>
-          <input id="enq-booking" className="field" autoCapitalize="characters" autoComplete="off" value={booking} onChange={(e) => setBooking(e.target.value)} maxLength={40} aria-invalid={!!errors.booking} aria-describedby={errors.booking ? 'enq-booking-err' : 'enq-booking-hint'} />
+          <input id="enq-booking" className="field" autoCapitalize="characters" autoComplete="off" value={booking} onChange={(e) => { setBooking(e.target.value); setConfirming(false) }} maxLength={40} aria-invalid={!!errors.booking} aria-describedby={errors.booking ? 'enq-booking-err' : 'enq-booking-hint'} />
           {errors.booking
             ? <p id="enq-booking-err" className="mt-1 text-sm text-danger">{errors.booking}</p>
             : <p id="enq-booking-hint" className="hint mt-1">On your confirmation email.</p>}
@@ -145,19 +193,35 @@ export default function EnquiryChat({ hotels, today }: { hotels: Hotel[]; today:
       <ol ref={logRef} className="max-h-[26rem] space-y-3 overflow-y-auto p-4 sm:p-5" aria-label="Conversation" aria-live="polite">
         {conv.messages.map((m) => (
           <li key={m.id} className={`flex ${m.from === 'customer' ? 'justify-end' : 'justify-start'}`}>
-            <p
+            <div
               className={`max-w-[85%] rounded-2xl px-4 py-2.5 leading-relaxed ${
-                m.from === 'customer' ? 'rounded-br-md bg-teal text-white' : 'rounded-bl-md bg-paper'
+                m.from === 'customer' ? 'rounded-br-md bg-teal text-white' : 'rounded-bl-md bg-paper response-reveal'
               }`}
             >
               <span className="sr-only">{m.from === 'customer' ? 'You: ' : 'Assistant: '}</span>
-              {m.text}
-            </p>
+              {editing === m.id ? <div className="space-y-2">
+                <label className="label" htmlFor="edit-enquiry">Edit your answer</label>
+                {editBefore?.input === 'choices'
+                  ? <select id="edit-enquiry" className="field" value={editText} onChange={(e) => setEditText(e.target.value)}>{editBefore?.quickReplies.map((q) => <option key={q.value} value={q.value}>{q.label}</option>)}</select>
+                  : <input id="edit-enquiry" className="field" type={editBefore?.input === 'date' ? 'date' : 'text'} maxLength={1000} value={editText} onChange={(e) => setEditText(e.target.value)} />}
+                <p className="text-xs">Updating this answer replaces the following questions and answers. Booking details are kept.</p>
+                <button type="button" className="btn btn-secondary" onClick={() => saveEdit(m.id)}>Update answer</button>{' '}
+                <button type="button" className="underline" onClick={() => setEditing(null)}>Cancel</button>
+              </div> : <>{m.text}{m.from === 'customer' && <button type="button" className="chat-edit" disabled={thinking || submitting} onClick={() => {
+                const checkpoint = checkpoints.current.get(m.id)
+                if (!checkpoint) return
+                setEditBefore(checkpoint.before)
+                setEditing(m.id)
+                setConfirming(false)
+                setEditText(checkpoint.input.kind === 'text' ? checkpoint.input.text : checkpoint.input.value)
+              }}>Edit</button>}</>}
+            </div>
           </li>
         ))}
+        {thinking && <li><Typing /></li>}
       </ol>
 
-      {conv.step !== 'review' && (
+      {conv.step !== 'review' && !thinking && editing === null && (
         <div className="border-t border-line p-4 sm:p-5">
           {conv.quickReplies.length > 0 && (
             <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="Suggested answers">
@@ -193,7 +257,7 @@ export default function EnquiryChat({ hotels, today }: { hotels: Hotel[]; today:
         </div>
       )}
 
-      {conv.step === 'review' && (
+      {conv.step === 'review' && !thinking && editing === null && (
         <form onSubmit={onSubmit} className="space-y-4 border-t border-line p-4 sm:p-5" noValidate>
           <h3 className="font-bold">Your enquiry</h3>
           <div className="grid gap-3 sm:grid-cols-2">

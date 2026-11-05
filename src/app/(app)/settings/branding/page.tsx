@@ -24,7 +24,10 @@ export default async function BrandingPage() {
 
       <section className="panel p-4 sm:p-5">
         <h2 className="mb-1 text-lg font-semibold">Logo</h2>
+        <h3 className="label">Default / light theme</h3>
         <LogoUploader current={b.logo_key ? logoPath(b.slug, b.logo_version) : null} />
+        <h3 className="label mt-5">Dark theme (optional)</h3>
+        <LogoUploader dark current={b.dark_logo_key ? `${logoPath(b.slug, b.logo_version)}&theme=dark` : null} />
       </section>
 
       <section className="panel p-4 sm:p-5">

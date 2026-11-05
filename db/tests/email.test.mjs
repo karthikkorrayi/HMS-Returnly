@@ -103,7 +103,7 @@ const noSend = async () => { throw new Error('must not send') }
 const logs = []
 const p1 = await dispatch(ownerDb, { mode: 'preview', baseUrl: 'https://staging.example', from: { email: 'notifications@foundora.co.uk', name: 'Foundora' }, send: noSend, log: (m) => logs.push(m) })
 const prev = (await outbox(L.reference))[0]
-check(p1.previewed >= 8 && prev.status === 'previewed' && /Your lost item report LF-/.test(prev.subject), 'renders and keeps a copy, sends nothing', JSON.stringify(p1))
+check(p1.previewed >= 8 && prev.status === 'previewed' && /Your hotel lost property enquiry LF-/.test(prev.subject), 'renders and keeps a copy, sends nothing', JSON.stringify(p1))
 check(prev.body_text.includes('[your private tracking link]') && !/#t=[0-9a-f]{64}/.test(prev.body_text), 'the kept copy has the link blanked out')
 check(!prev.body_text.includes('Ann Guest') && !prev.body_text.includes('BK-1') && !prev.body_text.includes('spa'),
   'no name, booking ID or staff message text in the email')

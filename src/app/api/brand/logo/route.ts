@@ -52,7 +52,7 @@ export async function POST(req: Request) {
   if (!body) return json(413, { error: 'The logo is larger than 1 MB.' })
   const store = photoStore()
   try {
-    const old = await withStaff(m.session.staff.user_id, (tx) => replaceLogo(tx, store, m.session.staff.property_id, body))
+    const old = await withStaff(m.session.staff.user_id, (tx) => replaceLogo(tx, store, m.session.staff.property_id, body, new URL(req.url).searchParams.get('theme') === 'dark'))
     if (old) await store.delete(old).catch((e) => console.error('old logo delete failed', e?.code ?? e?.message))
     return json(201, { ok: true })
   } catch (e) {
@@ -67,7 +67,7 @@ export async function DELETE(req: Request) {
   if (m.error) return m.error
   const store = photoStore()
   try {
-    const old = await withStaff(m.session.staff.user_id, removeLogo)
+    const old = await withStaff(m.session.staff.user_id, (tx) => removeLogo(tx, new URL(req.url).searchParams.get('theme') === 'dark'))
     if (old) await store.delete(old).catch((e) => console.error('old logo delete failed', e?.code ?? e?.message))
     return json(200, { ok: true })
   } catch (e) {

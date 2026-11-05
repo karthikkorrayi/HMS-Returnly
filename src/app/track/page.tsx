@@ -1,7 +1,5 @@
-import Link from 'next/link'
 import type { Metadata } from 'next'
-import Brand from '@/components/foundora/Brand'
-import ThemeToggle from '@/components/foundora/Theme'
+import GuestHeader from '@/components/foundora/GuestHeader'
 import TrackEnquiry from '@/components/enquiry/TrackEnquiry'
 
 export const metadata: Metadata = { title: 'Check a report — Foundora' }
@@ -21,23 +19,7 @@ export default async function TrackPage({
 
   return (
     <div className="overview-shell">
-      <header className="border-b border-line bg-surface">
-        <div className="mx-auto flex max-w-4xl items-center justify-between gap-4 px-5 py-5 sm:px-8">
-          <Link
-            href="/"
-            aria-label="Foundora home"
-            className="flex items-center gap-3"
-          >
-            <Brand />
-          </Link>
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <Link href="/" className="btn btn-secondary">
-              New enquiry
-            </Link>
-          </div>
-        </div>
-      </header>
+      <GuestHeader />
       <main className="mx-auto max-w-4xl px-5 py-8 sm:px-8 sm:py-12">
         <h1 className="text-3xl font-bold tracking-tight">Check a report</h1>
         <p className="mt-2 max-w-prose text-muted">

@@ -117,6 +117,22 @@ check(mail && mail.html.includes('https://staging.example/brand/grand-london/log
 check(mail && mail.html.includes('#0b3d2e'), '…in the hotel’s colour')
 check(mail && mail.text.includes('Thank you for staying with us.'), '…with its welcome line in the first email')
 
+
+console.log('\nDark logo isolation and fallback')
+check((await A((tx) => br.publicLogoKey(tx, 'grand-london', true))) === b2.logo_key, 'dark theme falls back to the default logo')
+const darkOld = await S(MGR, (tx) => br.replaceLogo(tx, store, DEMO, JPEG, true))
+const darkBrand = await S(MGR, br.loadBranding)
+check(darkOld === null && darkBrand.dark_logo_key !== darkBrand.logo_key && files_.has(darkBrand.dark_logo_key), 'dark logo is stored separately')
+check(darkBrand.logo_version === 3, 'dark replacement invalidates cached logo URLs')
+check((await A((tx) => br.publicLogoKey(tx, 'grand-london', true))) === darkBrand.dark_logo_key, 'public dark endpoint resolves the selected variant')
+check((await A((tx) => br.publicLogoKey(tx, 'grand-london'))) === b2.logo_key, 'dark upload does not replace the light variant')
+check(/Only managers/.test(await attempt(HK, (tx) => br.removeLogo(tx, true))), 'housekeeping cannot remove the dark logo')
+check(await attempt(MGR, (tx) => tx.rpc('set_hotel_dark_logo', { p_key: otherKey })) === '22023', 'dark logo cannot reference another hotel folder')
+check((await S(OTHER, (tx) => br.removeLogo(tx, true))) === null, 'another hotel manager cannot remove this hotel dark logo')
+check((await A((tx) => br.publicLogoKey(tx, 'grand-london', true))) === darkBrand.dark_logo_key, 'other hotel changes leave this hotel logo intact')
+check((await S(MGR, (tx) => br.removeLogo(tx, true))) === darkBrand.dark_logo_key, 'removing returns the dark file key for cleanup')
+check((await A((tx) => br.publicLogoKey(tx, 'grand-london', true))) === b2.logo_key, 'removal restores the default fallback')
+
 if (real) await pool.end()
 else await db.exec('reset role')
 await close()

@@ -1,6 +1,7 @@
 'use client'
 
 import { startTransition, useActionState, useEffect, useRef } from 'react'
+import { notify } from '@/components/foundora/Toast'
 import { initialActionState, type ActionState } from '@/lib/types'
 
 type Props = {
@@ -25,6 +26,11 @@ export default function InlineAction({
   action, hidden = {}, submitLabel, pendingLabel, variant = 'secondary', confirmText, okText, resetOnOk, className = '', children,
 }: Props) {
   const [state, formAction, pending] = useActionState(action, initialActionState)
+  useEffect(() => {
+    if (state.error) notify('error', state.error)
+    else if (state.ok) notify('success', okText || 'Changes saved.')
+  }, [state, okText])
+
   const form = useRef<HTMLFormElement>(null)
   useEffect(() => {
     if (resetOnOk && state.ok) form.current?.reset()

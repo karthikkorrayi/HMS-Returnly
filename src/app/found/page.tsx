@@ -1,7 +1,6 @@
-import Link from 'next/link'
+import SelectHotel from '@/components/foundora/SelectHotel'
 import type { Metadata } from 'next'
-import Brand from '@/components/foundora/Brand'
-import ThemeToggle from '@/components/foundora/Theme'
+import GuestHeader from '@/components/foundora/GuestHeader'
 import FoundReportForm from '@/components/enquiry/FoundReportForm'
 import { listHotels } from '@/lib/requests/public-actions'
 import { hotelToday } from '@/lib/format'
@@ -15,17 +14,8 @@ export default async function FoundPage({ searchParams }: { searchParams: Promis
   const hotels = await listHotels()
   return (
     <div className="overview-shell">
-      <header className="border-b border-line bg-surface">
-        <div className="mx-auto flex max-w-4xl items-center justify-between gap-4 px-5 py-5 sm:px-8">
-          <Link href="/" aria-label="Foundora home" className="flex items-center gap-3">
-            <Brand />
-          </Link>
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <Link href="/" className="btn btn-secondary">Home</Link>
-          </div>
-        </div>
-      </header>
+      {hotels.some((h) => h.inn_code === initialHotel) && <SelectHotel code={initialHotel} />}
+      <GuestHeader />
       <main className="mx-auto max-w-3xl px-5 py-8 sm:px-8 sm:py-12">
         <h1 className="text-3xl font-bold tracking-tight">Hand in a found item</h1>
         <p className="mt-2 max-w-prose text-muted">

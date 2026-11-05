@@ -49,12 +49,13 @@ export type Branding = {
   brand_colour: string | null
   brand_intro: string | null
   logo_key: string | null
+  dark_logo_key: string | null
   logo_version: number
 }
 
 export async function loadBranding(tx: Tx): Promise<Branding> {
   const { rows } = await tx.query<Branding>(
-    `select inn_code, name, slug, brand_colour, brand_intro, logo_key, logo_version
+    `select inn_code, name, slug, brand_colour, brand_intro, logo_key, dark_logo_key, logo_version
        from public.properties where id = public.current_property_id()`
   )
   if (!rows[0]) throw new BrandingError('Hotel not found.')
@@ -77,7 +78,7 @@ export async function saveBranding(tx: Tx, input: { slug: string; colour: string
  * item photo, and points the hotel at it. Returns the previous key, which the
  * caller deletes after the change is saved.
  */
-export async function replaceLogo(tx: Tx, store: PhotoStore, propertyId: string, body: Uint8Array): Promise<string | null> {
+export async function replaceLogo(tx: Tx, store: PhotoStore, propertyId: string, body: Uint8Array, dark = false): Promise<string | null> {
   if (body.byteLength > MAX_LOGO_BYTES) throw new BrandingError('The logo is larger than 1 MB.')
   let clean: Uint8Array
   try {
@@ -88,17 +89,19 @@ export async function replaceLogo(tx: Tx, store: PhotoStore, propertyId: string,
   const key = `${propertyId}/brand/${randomUUID()}.jpg`
   await store.put(key, clean, 'image/jpeg')
   try {
-    const r = await tx.rpc<{ set_hotel_logo: string | null }>('set_hotel_logo', { p_key: key })
-    return r.rows[0].set_hotel_logo
+    const fn = dark ? 'set_hotel_dark_logo' : 'set_hotel_logo'
+    const r = await tx.rpc(fn, { p_key: key })
+    return r.rows[0][fn] as string | null
   } catch (e) {
     await store.delete(key).catch(() => {})
     throw e
   }
 }
 
-export async function removeLogo(tx: Tx): Promise<string | null> {
-  const r = await tx.rpc<{ set_hotel_logo: string | null }>('set_hotel_logo', { p_key: null })
-  return r.rows[0].set_hotel_logo
+export async function removeLogo(tx: Tx, dark = false): Promise<string | null> {
+  const fn = dark ? 'set_hotel_dark_logo' : 'set_hotel_logo'
+  const r = await tx.rpc(fn, { p_key: null })
+  return r.rows[0][fn] as string | null
 }
 
 export type PublicHotel = { inn_code: string; name: string; slug: string; brand_colour: string | null; has_logo: boolean; logo_version: number }
@@ -107,8 +110,9 @@ export async function publicHotels(tx: Tx): Promise<PublicHotel[]> {
   return (await tx.rpc<PublicHotel>('public_hotels')).rows
 }
 
-export async function publicLogoKey(tx: Tx, slug: string): Promise<string | null> {
+export async function publicLogoKey(tx: Tx, slug: string, dark = false): Promise<string | null> {
   if (!isValidSlug(slug)) return null
-  const r = await tx.rpc<{ public_hotel_logo: string | null }>('public_hotel_logo', { p_slug: slug })
-  return r.rows[0]?.public_hotel_logo ?? null
+  const fn = dark ? 'public_hotel_dark_logo' : 'public_hotel_logo'
+  const r = await tx.rpc(fn, { p_slug: slug })
+  return r.rows[0]?.[fn] as string | null ?? null
 }

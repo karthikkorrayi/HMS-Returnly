@@ -126,7 +126,7 @@ export const ruleBasedAssistant: EnquiryAssistant = {
         {
           id: 2,
           from: 'assistant',
-          text: 'What did you lose? Describe it in your own words — colour, brand, and anything that makes it yours.',
+          text: 'What might you have left at the hotel? Describe the item, including its colour, brand and identifying details.',
         },
       ],
       quickReplies: [],

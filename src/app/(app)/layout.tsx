@@ -10,6 +10,8 @@ import { withStaff } from '@/lib/db'
 import { NOTIFIED_ROLES, unreadCount } from '@/lib/notifications'
 import { signOut } from './actions'
 import Nav from './Nav'
+import StaffHelp from '@/components/foundora/StaffHelp'
+import NotificationLive from '@/components/foundora/NotificationLive'
 
 export default async function AppLayout({
   children,
@@ -24,6 +26,8 @@ export default async function AppLayout({
 
   return (
     <StaffHotelProvider slug={property.slug}>
+    {notified && <NotificationLive />}
+    <StaffHelp />
     <div className="overview-shell min-h-screen md:grid md:grid-cols-[15rem_minmax(0,1fr)]">
       <aside className="hidden border-r border-line bg-surface p-5 md:sticky md:top-0 md:flex md:h-screen md:flex-col md:gap-7">
         <div>

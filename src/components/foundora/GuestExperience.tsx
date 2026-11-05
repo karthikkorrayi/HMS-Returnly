@@ -12,6 +12,7 @@ import {
   supportTopics,
   type SupportTopic,
 } from '@/lib/guest-support'
+import Typing from './Typing'
 import ThemeToggle from './Theme'
 
 type Hotel = { inn_code: string; name: string; slug?: string; has_logo?: boolean; logo_version?: number }
@@ -88,6 +89,18 @@ export default function GuestExperience({
     { from: 'you' | 'assistant'; text: string }[]
   >([])
   const [text, setText] = useState('')
+  const [thinking, setThinking] = useState(false)
+  const busy = useRef(false)
+  const responseTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [editing, setEditing] = useState<number | null>(null)
+  const [editText, setEditText] = useState('')
+  function cancelReply() {
+    if (responseTimer.current) clearTimeout(responseTimer.current)
+    busy.current = false
+    setThinking(false)
+    setEditing(null)
+  }
+  useEffect(() => () => { if (responseTimer.current) clearTimeout(responseTimer.current) }, [])
   const dialog = useRef<HTMLDialogElement>(null)
   const launcher = useRef<HTMLButtonElement>(null)
   const restoreFocus = useRef<HTMLElement | null>(null)
@@ -104,18 +117,24 @@ export default function GuestExperience({
     setMode(next)
     setOpen(true)
   }
-  function choose(next: SupportTopic) {
-    setTopic(next)
-    setHistory((current) => [
-      ...current.slice(-36),
-      { from: 'you', text: supportTopics[next] },
-      {
-        from: 'assistant',
-        text: supportMessage(next, hotel?.name ?? 'your hotel').text,
-      },
-    ])
+  function answer(value: string, next: SupportTopic | null, index?: number) {
+    if (busy.current) return
+    const base = index === undefined ? history : history.slice(0, index)
+    const reply = next ? supportMessage(next, hotel?.name ?? 'your hotel').text
+      : 'This guide covers items left at the hotel, ownership checks, collection and delivery. Use the enquiry form to send details to staff, or contact the hotel directly. Please keep personal details out of guidance chat.'
+    setHistory([...base, { from: 'you', text: value }])
     setText('')
+    setEditing(null)
+    busy.current = true
+    setThinking(true)
+    responseTimer.current = setTimeout(() => {
+      setTopic(next ?? 'start')
+      setHistory([...base, { from: 'you', text: value }, { from: 'assistant', text: reply }])
+      busy.current = false
+      setThinking(false)
+    }, 2400)
   }
+  function choose(next: SupportTopic) { answer(supportTopics[next], next) }
   useEffect(() => {
     if (open) dialog.current?.showModal()
     else dialog.current?.close()
@@ -137,6 +156,7 @@ export default function GuestExperience({
         contact,
         selectHotel: (code) => {
           if (hotels.some((h) => h.inn_code === code) || code === '') {
+            cancelReply()
             setSelected(code)
             setHistory([])
             setTopic('start')
@@ -178,8 +198,9 @@ export default function GuestExperience({
         id="foundora-support"
         aria-labelledby="support-title"
         aria-describedby="support-description"
-        onCancel={() => setOpen(false)}
+        onCancel={() => { cancelReply(); setOpen(false) }}
         onClose={() => {
+          cancelReply()
           setOpen(false)
           const target = restoreFocus.current?.isConnected
             ? restoreFocus.current
@@ -190,7 +211,7 @@ export default function GuestExperience({
         <header className="support-heading">
           <div>
             <h2 id="support-title">
-              {mode === 'enquiry' ? 'Report a lost item' : 'Foundora support'}
+              {mode === 'enquiry' ? 'Report an item left behind' : 'Guest guidance'}
             </h2>
             <p id="support-description">
               {hotel?.name ?? 'Select your hotel'} · Guided assistant
@@ -218,7 +239,7 @@ export default function GuestExperience({
             aria-pressed={mode === 'enquiry'}
             onClick={() => setMode('enquiry')}
           >
-            Report a lost item
+            Report an item left behind
           </button>
           <Link href="/track" onClick={() => setOpen(false)}>
             Check an enquiry
@@ -242,6 +263,7 @@ export default function GuestExperience({
                   )
                 )
                   return
+                cancelReply()
                 setSelected(event.target.value)
                 setHistory([])
                 setTopic('start')
@@ -268,18 +290,25 @@ export default function GuestExperience({
             {history.map((m, i) => (
               <div
                 key={i}
-                className={`chat-message ${m.from === 'you' ? 'chat-you' : ''}`}
+                className={`chat-message ${m.from === 'you' ? 'chat-you' : 'response-reveal'}`}
               >
                 <span className="sr-only">{m.from}: </span>
-                {m.text}
+                {editing === i ? <div>
+                  <label className="label" htmlFor="guide-edit">Edit your message</label>
+                  <input id="guide-edit" className="field" maxLength={250} value={editText} onChange={(e) => setEditText(e.target.value)} />
+                  <p className="hint">Later guidance will be replaced.</p>
+                  <button type="button" className="btn btn-secondary" disabled={!editText.trim()} onClick={() => answer(editText, detectSupportTopic(editText), i)}>Update</button>{' '}
+                  <button type="button" onClick={() => setEditing(null)}>Cancel</button>
+                </div> : <>{m.text}{m.from === 'you' && <button className="chat-edit" type="button" disabled={thinking} onClick={() => { setEditing(i); setEditText(m.text) }}>Edit</button>}</>}
               </div>
             ))}
+            {thinking && <Typing />}
           </div>
           <div className="support-options">
             {topic === 'contact' && <HotelContact contact={contact} />}
             <div className="chat-choices">
               {message.next.map((next) => (
-                <button type="button" key={next} onClick={() => choose(next)}>
+                <button type="button" key={next} disabled={thinking || editing !== null} onClick={() => choose(next)}>
                   {supportTopics[next]}
                 </button>
               ))}
@@ -290,18 +319,8 @@ export default function GuestExperience({
             onSubmit={(event) => {
               event.preventDefault()
               if (!text.trim()) return
-              const next = detectSupportTopic(text)
-              if (next) choose(next)
-              else {
-                setHistory((current) => [
-                  ...current.slice(-36),
-                  {
-                    from: 'assistant',
-                    text: 'I can help with a lost item, collection, delivery or contacting the hotel. Choose an option, or open the report form to send an enquiry. Please keep personal details out of guidance chat.',
-                  },
-                ])
-                setText('')
-              }
+              if (thinking || editing !== null) return
+              answer(text.trim(), detectSupportTopic(text))
             }}
           >
             <label htmlFor="support-message" className="sr-only">
@@ -316,12 +335,12 @@ export default function GuestExperience({
               onChange={(e) => setText(e.target.value)}
               autoComplete="off"
             />
-            <button className="btn btn-primary" disabled={!text.trim()}>
+            <button className="btn btn-primary" disabled={!text.trim() || thinking || editing !== null}>
               Send
             </button>
           </form>
           <p className="support-privacy">
-            Guidance stays in this tab. Only the report form submits an enquiry.
+            This is a guided form, not live staff chat. Guidance stays in this tab; only the enquiry form sends details to the hotel.
           </p>
         </div>
         <div className="enquiry-pane" hidden={mode !== 'enquiry'}>

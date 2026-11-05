@@ -1,5 +1,7 @@
 'use client'
 
+import { notify } from '@/components/foundora/Toast'
+import { useGuestExperience } from '@/components/foundora/GuestExperience'
 import { useState } from 'react'
 import { submitReport } from '@/lib/requests/public-actions'
 import { CONFIRM_EMAIL_TEXT, emailTypoHint, isValidEmail, normaliseEmail } from '@/lib/requests/email'
@@ -15,6 +17,7 @@ const PLACES: FoundWhereabouts[] = ['handed_in', 'with_finder', 'left_in_place']
 // hotel. Only what the hotel needs to find and log the item. The finder is
 // asked to take it to reception and is never shown an owner or a match.
 export default function FoundReportForm({ hotels, today, initialHotel }: { hotels: Hotel[]; today: string; initialHotel: string }) {
+  const { selectHotel } = useGuestExperience()
   const [hotel, setHotel] = useState(
     hotels.some((h) => h.inn_code === initialHotel) ? initialHotel : hotels.length === 1 ? hotels[0].inn_code : ''
   )
@@ -49,8 +52,10 @@ export default function FoundReportForm({ hotels, today, initialHotel }: { hotel
   }
 
   async function onConfirmed() {
+    if (busy) return
     setBusy(true)
     setError(null)
+    try {
     const res = await submitReport({
       innCode: hotel,
       reportType: 'found',
@@ -69,8 +74,10 @@ export default function FoundReportForm({ hotels, today, initialHotel }: { hotel
     })
     setBusy(false)
     setConfirming(false)
-    if (res.ok) setSent({ reference: res.reference, token: res.token })
-    else setError(res.error)
+    if (res.ok) { setSent({ reference: res.reference, token: res.token }); notify('success', 'Found-item report sent to the hotel.') }
+    else { setError(res.error); notify('error', res.error) }
+    } catch { setError('Could not send your report. Check your connection and try again.'); notify('error', 'The report could not be sent.') }
+    finally { setBusy(false); setConfirming(false) }
   }
 
   if (sent) {
@@ -92,7 +99,7 @@ export default function FoundReportForm({ hotels, today, initialHotel }: { hotel
       {hotels.length > 1 && (
         <div>
           <label htmlFor="fnd-hotel" className="label">Hotel</label>
-          <select id="fnd-hotel" className="field" value={hotel} onChange={(e) => setHotel(e.target.value)} aria-invalid={!!errors.hotel}>
+          <select id="fnd-hotel" className="field" value={hotel} onChange={(e) => { setHotel(e.target.value); selectHotel(e.target.value) }} aria-invalid={!!errors.hotel}>
             <option value="">Choose…</option>
             {hotels.map((h) => <option key={h.inn_code} value={h.inn_code}>{h.name}</option>)}
           </select>

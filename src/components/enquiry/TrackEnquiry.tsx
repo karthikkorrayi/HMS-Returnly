@@ -1,5 +1,6 @@
 'use client'
 
+import { notify } from '@/components/foundora/Toast'
 import { useEffect, useState } from 'react'
 import { lookupByLink, lookupEnquiry, replyByLink, replyToEnquiry } from '@/lib/requests/public-actions'
 import { customerStatus, type CustomerStatusView } from '@/lib/requests/types'
@@ -59,15 +60,19 @@ export default function TrackEnquiry({ initialRef }: { initialRef: string }) {
 
   async function onReply(e: React.FormEvent) {
     e.preventDefault()
-    if (!view) return
+    if (!view || sending) return
     setSending(true)
     setReplyError(null)
+    try {
     const res = token ? await replyByLink(view.reference, token, reply) : await replyToEnquiry(view.reference, booking, reply)
     setSending(false)
     if (res.ok) {
       setView(res.view)
       setReply('')
-    } else setReplyError(res.error)
+      notify('success', 'Your reply has been sent to the hotel.')
+    } else { setReplyError(res.error); notify('error', res.error) }
+    } catch { setReplyError('Could not send your reply. Please try again.'); notify('error', 'The reply could not be sent.') }
+    finally { setSending(false) }
   }
 
   const status = view ? customerStatus(view.status, view.report_type ?? 'lost') : null

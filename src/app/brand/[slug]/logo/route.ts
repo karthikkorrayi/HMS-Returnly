@@ -10,7 +10,7 @@ const notFound = () => new Response('Not found', { status: 404, headers: { 'cach
 export async function GET(_req: Request, ctx: { params: Promise<{ slug: string }> }) {
   const { slug } = await ctx.params
   try {
-    const key = await withAnon((tx) => publicLogoKey(tx, decodeURIComponent(slug).toLowerCase()))
+    const key = await withAnon((tx) => publicLogoKey(tx, decodeURIComponent(slug).toLowerCase(), new URL(_req.url).searchParams.get('theme') === 'dark'))
     if (!key || !/^[0-9a-f-]{36}\/brand\/[0-9a-f-]{36}\.jpg$/.test(key)) return notFound()
     const file = await photoStore().get(key)
     if (!file) return notFound()

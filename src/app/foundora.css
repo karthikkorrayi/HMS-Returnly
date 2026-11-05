@@ -910,3 +910,84 @@ select:focus-visible {
     padding: 6px 8px;
   }
 }
+
+/* FoundOra service redesign: theme assets, measured surfaces and accessible motion. */
+:root { --brand-navy:#07133f; --color-teal:#075bd8; --color-teal-dark:#0848a0; --color-teal-soft:#eaf3ff; --accent-text:#0848a0; --hero-accent:#075bd8; --color-paper:#f5f7fc; --shadow:0 12px 36px #07133f0a; }
+:root[data-theme='dark'] { --color-paper:#080e20; --color-surface:#111b30; --color-line:#2b3b57; --color-teal:#2368dd; --color-teal-dark:#8edfff; --accent-text:#8edfff; --hero-accent:#8edfff; --color-teal-soft:#122c49; --brand-navy:#f1f5ff; }
+.platform-brand { display:inline-flex; align-items:center; max-width:100%; }
+.platform-brand .foundora-logo { width:clamp(140px,21vw,280px); height:auto; max-height:96px; object-fit:contain; border:0; border-radius:0; padding:0; background:transparent; box-shadow:none; }
+.brand-dark { display:none!important; }
+:root[data-theme='dark'] .brand-light { display:none!important; }
+:root[data-theme='dark'] .brand-dark { display:block!important; }
+.guest-header { gap:20px; }
+.guest-header-actions { margin-left:auto; }
+.guest-hotel-identity { display:flex; flex-direction:column; align-items:flex-start; gap:6px; min-width:0; }
+.hotel-logo-plate { display:inline-flex; background:#fff; border-radius:10px; padding:6px 12px; }
+.hotel-logo-plate img { width:auto; height:48px; max-width:180px; object-fit:contain; }
+.hotel-header-name { font-size:.85rem; font-weight:650; overflow-wrap:anywhere; }
+.panel { box-shadow:var(--shadow); }
+.panel, .guest-action-panel { border-radius:18px; }
+.field { transition:border-color .15s,box-shadow .15s; min-width:0; }
+.field:focus { border-color:var(--color-teal); box-shadow:0 0 0 3px var(--color-teal-soft); }
+.btn { transition:background-color .15s,transform .15s,box-shadow .15s; }
+.btn:active:not(:disabled) { transform:translateY(1px); }
+button:disabled { cursor:wait; opacity:.65; }
+.chat-edit { display:block; margin-top:8px; font-size:.75rem; text-decoration:underline; font-weight:600; color:inherit; }
+.response-reveal { animation:response-reveal .4s ease-out both; }
+@keyframes response-reveal { from { opacity:0; transform:translateY(5px); filter:blur(2px); } to { opacity:1; transform:none; filter:none; } }
+.typing-indicator { display:inline-flex; align-items:center; gap:5px; min-height:40px; padding:12px 18px; border-radius:16px; background:var(--color-paper); }
+.typing-indicator i { width:6px; height:6px; background:var(--color-muted); border-radius:50%; animation:typing-dot 1s infinite ease-in-out; }
+.typing-indicator i:nth-child(2) { animation-delay:.15s; }
+.typing-indicator i:nth-child(3) { animation-delay:.3s; }
+@keyframes typing-dot { 0%,70%,100% { opacity:.35; transform:translateY(0); } 35% { opacity:1; transform:translateY(-4px); } }
+.toast-stack { position:fixed; top:max(18px,env(safe-area-inset-top)); right:18px; z-index:100; display:grid; gap:10px; width:min(390px,calc(100vw - 36px)); pointer-events:none; }
+.toast { display:flex; align-items:flex-start; gap:12px; padding:15px 17px; background:var(--color-surface); border:1px solid var(--color-line); border-left:4px solid var(--color-teal); border-radius:12px; box-shadow:0 8px 30px #0002; color:var(--color-ink); font-size:.9rem; pointer-events:auto; animation:toast-in .2s ease-out both; }
+.toast button { margin-left:auto; padding:0 4px; font-size:20px; line-height:1; }
+.toast-error { border-left-color:var(--color-danger); }
+.toast-success { border-left-color:var(--color-done); }
+.toast-leaving { animation:toast-out .3s ease-in both; }
+@keyframes toast-in { from { opacity:0; transform:translateY(-12px); } to { opacity:1; transform:none; } }
+@keyframes toast-out { to { opacity:0; transform:translateX(20px); } }
+.staff-help { position:fixed; right:20px; bottom:24px; z-index:25; }
+.staff-help .btn { min-height:34px; padding:6px 14px; font-size:.8rem; box-shadow:var(--shadow); }
+.staff-help-dialog { width:min(500px,calc(100vw - 32px)); padding:24px; background:var(--color-surface); color:var(--color-ink); border:1px solid var(--color-line); border-radius:18px; }
+.staff-help-dialog::backdrop { background:#050b2080; }
+.staff-help-dialog h2 { font-size:1.2rem; font-weight:700; }
+.staff-help-dialog p { margin:14px 0; color:var(--color-muted); line-height:1.6; }
+.logo-pending { padding:12px; border:1px dashed var(--color-line); border-radius:12px; }
+.logo-pending img { max-width:220px; max-height:90px; object-fit:contain; }
+@media(max-width:767px) { .staff-help { bottom:calc(90px + env(safe-area-inset-bottom)); right:12px; } .guest-header { flex-wrap:wrap; padding:18px; } .guest-header-actions { flex-wrap:wrap; justify-content:flex-end; gap:12px; } .guest-header .hotel-picker { order:3; width:100%; } .guest-header .platform-brand .foundora-logo { width:160px; } .hotel-logo-plate img { max-width:125px; height:40px; } }
+@media(prefers-reduced-motion:reduce) { .response-reveal,.typing-indicator i,.toast,.toast-leaving { animation:none; } .btn,.field { transition:none; } }
+
+/* FoundOra logo integration correction v2 */
+/* Blend the supplied raster backgrounds into the theme without changing assets. */
+.platform-brand {
+  display: block;
+  width: clamp(120px, 22vw, 260px);
+  max-width: 100%;
+  min-width: 0;
+  flex-shrink: 1;
+  mix-blend-mode: multiply;
+}
+:root[data-theme='dark'] .platform-brand { mix-blend-mode: lighten; }
+.platform-brand .foundora-logo {
+  width: 100% !important;
+  max-width: 100%;
+  height: auto;
+  max-height: none;
+  aspect-ratio: auto;
+  object-fit: contain;
+}
+.guest-header-actions { min-width: 0; }
+.guest-header-actions > a { display: block; min-width: 0; max-width: 260px; flex-shrink: 1; }
+.guest-hotel-identity { flex: 1 1 150px; min-width: 0; }
+.hotel-logo-plate { max-width: 100%; }
+.hotel-logo-plate img { max-width: 100%; object-fit: contain; }
+.theme-toggle { flex-shrink: 0; }
+@media (max-width: 600px) {
+  .guest-header { align-items: center; gap: 12px; }
+  .guest-header-actions { max-width: 100%; gap: 10px; }
+  .guest-header-actions > a { max-width: 160px; }
+  .platform-brand { width: clamp(120px, 40vw, 200px); }
+  .hotel-logo-plate img { max-width: 125px; }
+}
