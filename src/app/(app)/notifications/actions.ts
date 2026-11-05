@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { getSession } from '@/lib/auth'
 import { withStaff } from '@/lib/db'
-import { markRead, notificationTarget, NOTIFIED_ROLES, unreadCount } from '@/lib/notifications'
+import { markRead, notificationTarget, NOTIFIED_ROLES, unreadCount, loadNotifications } from '@/lib/notifications'
 import { staffPath } from '@/lib/staff-paths'
 
 // Each action re-checks the session; the database decides which
@@ -45,4 +45,13 @@ export async function markAllNotificationsRead(): Promise<void> {
   if (!me) redirect('/login')
   await withStaff(me.user_id, (tx) => markRead(tx, null))
   revalidatePath('/', 'layout')
+}
+
+/** Authorised snapshot; errors are propagated so the client can distinguish an outage. */
+export async function notificationSnapshot() {
+  const me = await staff()
+  if (!me) return null
+  return withStaff(me.user_id, async (tx) => ({
+    count: await unreadCount(tx), items: await loadNotifications(tx, 200),
+  }))
 }

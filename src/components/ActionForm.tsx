@@ -1,6 +1,7 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useEffect } from 'react'
+import { notify } from '@/components/foundora/Toast'
 import { initialActionState, type ActionState } from '@/lib/types'
 
 type Props = {
@@ -26,6 +27,11 @@ export default function ActionForm({
   children,
 }: Props) {
   const [state, formAction, pending] = useActionState(action, initialActionState)
+  useEffect(() => {
+    if (state.error) notify('error', state.error)
+    else if (state.ok) notify('success', 'Changes saved.')
+  }, [state])
+
 
   return (
     <form

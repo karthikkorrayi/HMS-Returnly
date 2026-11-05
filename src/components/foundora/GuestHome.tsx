@@ -2,14 +2,12 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import Brand from './Brand'
-import ThemeToggle from './Theme'
+import GuestHeader from './GuestHeader'
 import { HotelContact, useGuestExperience } from './GuestExperience'
 import ReturnlyIcon from '@/components/ReturnlyIcon'
-import { logoPath } from '@/lib/branding-paths'
 
 export default function GuestHome() {
-  const { hotels, hotel, contact, selectHotel, openEnquiry } =
+  const { hotels, hotel, contact, openEnquiry } =
     useGuestExperience()
   const [view, setView] = useState<'start' | 'process' | 'contact'>('start')
   return (
@@ -17,42 +15,7 @@ export default function GuestHome() {
       <a className="skip-link" href="#guest-main">
         Skip to content
       </a>
-      <header className="guest-header">
-        <Link href="/" aria-label="Foundora home">
-          <Brand />
-        </Link>
-        <div className="guest-header-actions">
-          {hotels.length > 1 ? (
-            <div className="hotel-picker">
-              <label className="sr-only" htmlFor="homepage-hotel">
-                Your hotel
-              </label>
-              <select
-                id="homepage-hotel"
-                className="field"
-                value={hotel?.inn_code ?? ''}
-                onChange={(e) => selectHotel(e.target.value)}
-              >
-                <option value="">Choose your hotel</option>
-                {hotels.map((h) => (
-                  <option key={h.inn_code} value={h.inn_code}>
-                    {h.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : (
-            <span className="hotel-header-name flex items-center gap-2">
-              {hotel?.has_logo && hotel.slug && (
-                // eslint-disable-next-line @next/next/no-img-element -- the hotel's own small logo, served by this app
-                <img src={logoPath(hotel.slug, hotel.logo_version ?? 0)} alt="" height={32} className="h-8 w-auto max-w-24 rounded object-contain" />
-              )}
-              {hotel?.name ?? 'Hotel lost & found'}
-            </span>
-          )}
-          <ThemeToggle />
-        </div>
-      </header>
+      <GuestHeader allowHotelSelection />
       <main className="guest-main" id="guest-main">
         <section className="guest-introduction" aria-label="Welcome">
           <div>
@@ -61,14 +24,14 @@ export default function GuestHome() {
                 ? `Welcome to ${hotel.name}`
                 : hotels.length > 1
                   ? 'Choose your hotel above'
-                  : 'Your belongings. Our care.'}
+                  : 'Hotel lost property enquiries'}
             </p>
             <h1>
-              Left behind.
-              <br className="desktop-break" /> <span>Never forgotten.</span>
+              Left something behind?
+              <br className="desktop-break" /> <span>Let your hotel help.</span>
             </h1>
             <p className="guest-subtitle">
-              Lost & found, with a little more peace of mind.
+              Tell the hotel what you may have left behind. The team will check its found-item records and contact you about possible matches.
             </p>
           </div>
           <div className="reunion-art" aria-hidden="true">
@@ -79,9 +42,9 @@ export default function GuestHome() {
               <span>
                 Found.
                 <br />
-                Safe.
+                Verified.
                 <br />
-                Home.
+                Returned.
               </span>
             </div>
             <span className="art-check">
@@ -94,7 +57,7 @@ export default function GuestHome() {
             <p className="eyebrow">How can we help?</p>
             {(
               [
-                { id: 'start', label: 'Lost something?', icon: 'search' },
+                { id: 'start', label: 'Left an item behind?', icon: 'search' },
                 { id: 'process', label: 'How it works', icon: 'shield' },
                 { id: 'contact', label: 'Contact your hotel', icon: 'chat' },
               ] as const
@@ -139,16 +102,16 @@ export default function GuestHome() {
             <div aria-live="polite" aria-atomic="true">
               <p className="eyebrow">
                 {view === 'start'
-                  ? '01 / Reconnect'
+                  ? '01 / Your enquiry'
                   : view === 'process'
-                    ? '02 / A thoughtful way back'
+                    ? '02 / Verification and return'
                     : '03 / Here to help'}
               </p>
               <h2 id="guest-panel-title">
                 {view === 'start'
-                  ? 'Let’s bring it back to you.'
+                  ? 'Tell us about your item.'
                   : view === 'process'
-                    ? 'From lost to reunited.'
+                    ? 'How recovery works.'
                     : (hotel?.name ?? 'Your hotel team')}
               </h2>
               {view === 'contact' ? (
@@ -163,7 +126,7 @@ export default function GuestHome() {
                 <>
                   <p className="panel-intro">
                     {view === 'start'
-                      ? 'Describe what you’ve lost. Our guided enquiry assistant will help gather the details, then your hotel team will check their records.'
+                      ? 'Describe the belongings you may have left at the hotel. The guided form gathers the details for the hotel team to review.'
                       : 'A clear process, with care at every step. Only hotel staff can confirm a match and arrange a return.'}
                   </p>
                   <ol className="guest-steps">
@@ -200,7 +163,7 @@ export default function GuestHome() {
                   onClick={openEnquiry}
                   disabled={hotels.length === 0}
                 >
-                  Report a lost item <ReturnlyIcon name="arrow" />
+                  Report an item left behind <ReturnlyIcon name="arrow" />
                 </button>
               )}
               <p className="hint">

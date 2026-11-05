@@ -3,6 +3,7 @@ import { headers } from 'next/headers'
 import '@fontsource-variable/public-sans'
 import './globals.css'
 import './foundora.css'
+import Toasts from '@/components/foundora/Toast'
 import GuestExperience from '@/components/foundora/GuestExperience'
 import { themeInit } from '@/components/foundora/Theme'
 import { loadGuestPresentation } from '@/lib/guest-presentation'
@@ -32,6 +33,7 @@ export default async function RootLayout({
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeInit }} />
       </head>
       <body className="min-h-full">
+        <Toasts />
         <GuestExperience
           hotels={hotels}
           contacts={contacts}

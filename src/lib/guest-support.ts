@@ -7,7 +7,7 @@ export type SupportTopic =
   | 'contact'
 export const supportTopics: Record<SupportTopic, string> = {
   start: 'Start again',
-  lost: 'I lost something',
+  lost: 'I left something behind',
   collection: 'Collect an item',
   shipping: 'Arrange delivery',
   sensitive: 'ID, cards or medication',
@@ -17,7 +17,7 @@ export function supportMessage(topic: SupportTopic, name: string) {
   switch (topic) {
     case 'lost':
       return {
-        text: `Let’s help ${name} check. Choose “Report a lost item” to use the hotel’s existing enquiry assistant. You’ll review the details before sending and receive a reference. Is your item an ID, card or medication?`,
+        text: `Let’s help ${name} check. Choose “Report an item left behind” to use the hotel’s existing enquiry assistant. You’ll review the details before sending and receive a reference. Is your item an ID, card or medication?`,
         next: ['sensitive', 'contact', 'start'] as SupportTopic[],
       }
     case 'collection':
@@ -42,7 +42,7 @@ export function supportMessage(topic: SupportTopic, name: string) {
       }
     default:
       return {
-        text: `Hello! I’m the guided support assistant for ${name}. I can help you report a lost item, follow an enquiry or plan a return. What would you like to do?`,
+        text: `Welcome to guest guidance for ${name}. If you may have left an item at the hotel, this guide explains how to submit an enquiry, verify ownership and arrange a return. Hotel staff review enquiries; this is not live chat.`,
         next: ['lost', 'collection', 'shipping', 'contact'] as SupportTopic[],
       }
   }
