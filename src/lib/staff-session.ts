@@ -21,7 +21,7 @@ export async function loadStaffSession(tx: Tx): Promise<Session | null> {
 
   const property = (
     await tx.query<Property>(
-      `select id, inn_code, name, retention_days, trace_window_days, stay_retention_days,
+      `select id, inn_code, name, slug, retention_days, trace_window_days, stay_retention_days,
               check_due_hours, request_retention_days
          from public.properties where id = $1`,
       [staff.property_id]

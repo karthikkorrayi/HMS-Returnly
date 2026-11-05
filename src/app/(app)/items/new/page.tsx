@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { ITEM_ROLES, requireSession } from '@/lib/auth'
+import { staffPath } from '@/lib/staff-paths'
 import { withStaff } from '@/lib/db'
 import { loadLoggingChoices } from '@/lib/hotel-config'
 import type { RoomCheck } from '@/lib/types'
@@ -10,7 +11,7 @@ export default async function NewItemPage({
 }: {
   searchParams: Promise<{ room?: string; check?: string }>
 }) {
-  const { staff } = await requireSession(ITEM_ROLES)
+  const { staff, property } = await requireSession(ITEM_ROLES)
   const params = await searchParams
   // Read as this staff member (row-level security: their hotel only).
   const checkId = params.check && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.check) ? params.check : null
@@ -39,7 +40,7 @@ export default async function NewItemPage({
         <p className="mt-3 rounded-lg bg-teal-soft px-3 py-2 text-sm">
           Logging items from the check of room <strong>{check.room_number}</strong>. Log each item separately — after
           saving one, come back to{' '}
-          <Link href={`/items/new?check=${check.id}`} className="font-semibold text-teal underline">this form</Link>{' '}
+          <Link href={staffPath(property.slug, `/items/new?check=${check.id}`)} className="font-semibold text-teal underline">this form</Link>{' '}
           for the next.
         </p>
       )}

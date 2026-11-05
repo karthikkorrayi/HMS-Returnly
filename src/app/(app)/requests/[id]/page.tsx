@@ -1,8 +1,10 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requireSession } from '@/lib/auth'
+import { staffPath } from '@/lib/staff-paths'
 import { withStaff } from '@/lib/db'
 import { loadRequestDetail, loadRequestMatches } from '@/lib/queries/requests'
+import { logReportView } from '@/lib/access-log'
 import { formatDate, formatDateTime } from '@/lib/format'
 import { CATEGORY_LABEL, STATUS_LABEL, TIER_LABEL, type ItemStatus } from '@/lib/types'
 import { OPEN_REQUEST_STATUSES, REQUEST_STATUS_LABEL, WHEREABOUTS_LABEL, type MatchRow } from '@/lib/requests/types'
@@ -23,12 +25,19 @@ const EVENT_LABEL: Record<string, string> = {
 }
 
 export default async function RequestPage({ params }: { params: Promise<{ id: string }> }) {
-  const { staff: me } = await requireSession(['manager', 'support'])
+  const { staff: me, property } = await requireSession(['manager', 'support'])
+  const to = (path: string) => staffPath(property.slug, path)
   const { id } = await params
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound()
 
   // Row-level security returns nothing unless you're Admin or the assigned Support member.
-  const detail = await withStaff(me.user_id, (tx) => loadRequestDetail(tx, id))
+  // Opening a report shows the customer's details: the view is recorded in the
+  // same transaction (migration 020), so there is no view without a record.
+  const detail = await withStaff(me.user_id, async (tx) => {
+    const d = await loadRequestDetail(tx, id)
+    if (d) await logReportView(tx, id)
+    return d
+  })
   if (!detail) notFound()
   const { req, messages, notes, events, staff } = detail
   const approvedItem = detail.approvedItem as { id: string; item_code: string; description: string; status: ItemStatus } | null
@@ -49,7 +58,7 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
   const closed = req.status === 'resolved'
   const hidden = { request_id: req.id }
   const assignable = staff.filter((s) => s.active && (s.role === 'support' || s.role === 'manager'))
-  const back = admin ? '/requests' : '/support'
+  const back = to(admin ? '/requests' : '/support')
 
   const found = req.report_type === 'found'
   const facts: [string, string][] = [
@@ -113,7 +122,7 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
                 <li key={m.item_id} className="rounded-lg border border-line p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="flex flex-wrap items-center gap-2">
-                      <Link href={`/items/${m.item_id}`} className="font-bold text-teal underline">{m.item_code}</Link>
+                      <Link href={to(`/items/${m.item_id}`)} className="font-bold text-teal underline">{m.item_code}</Link>
                       <MatchBandBadge band={m.band} />
                       {m.value_tier !== 'standard' && <span className="badge bg-attention-soft text-attention">{TIER_LABEL[m.value_tier]}</span>}
                     </p>
@@ -211,7 +220,7 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
                 {approvedItem && (
                   <p className="rounded-lg bg-done-soft p-3 text-sm">
                     Approved for{' '}
-                    <Link href={`/items/${approvedItem.id}`} className="font-semibold underline">{approvedItem.item_code}</Link>{' '}
+                    <Link href={to(`/items/${approvedItem.id}`)} className="font-semibold underline">{approvedItem.item_code}</Link>{' '}
                     ({STATUS_LABEL[approvedItem.status]}). Arrange collection or posting and record the handover on the item page.
                   </p>
                 )}

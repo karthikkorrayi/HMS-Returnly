@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { getAuth } from '@/lib/better-auth/instance'
 import { withStaff } from '@/lib/db'
 import { loadStaffSession, type Session } from '@/lib/staff-session'
+import { staffPath } from '@/lib/staff-paths'
 import type { StaffRole } from '@/lib/types'
 
 export type { Session } from '@/lib/staff-session'
@@ -51,18 +52,27 @@ export async function endCurrentSession(): Promise<void> {
 // Roles that work with found items (logging, storing, returning).
 export const ITEM_ROLES: StaffRole[] = ['housekeeping', 'front_office', 'manager']
 
-// Where each role lands after sign-in or when a page isn't theirs.
-export function homeFor(role: StaffRole) {
-  return role === 'support' ? '/support' : '/items'
+// Where each role lands after sign-in or when a page isn't theirs. With the
+// hotel's address it is the full staff address (/h/<slug>/items).
+export function homeFor(role: StaffRole, slug?: string) {
+  const path = role === 'support' ? '/support' : '/items'
+  return slug ? staffPath(slug, path) : path
 }
 
 // For pages: redirect to /login when there is no active staff session, and to
 // the role's own home when the page isn't for their role. This is a real
 // server-side check; the database enforces the same rules again.
+// Staff pages are addressed /h/<slug>/<module> (src/proxy.ts): if the address
+// names another hotel, or none (an old /items bookmark), the person is sent
+// to the same page at their own hotel. The address never grants access.
 export async function requireSession(roles?: StaffRole[]): Promise<Session> {
   const session = await getSession()
   if (!session) redirect('/login')
-  if (roles && !roles.includes(session.staff.role)) redirect(homeFor(session.staff.role))
+  const slug = session.property.slug
+  const h = await headers()
+  const path = h.get('x-foundora-path')
+  if (path && h.get('x-foundora-hotel') !== slug) redirect(staffPath(slug, path))
+  if (roles && !roles.includes(session.staff.role)) redirect(homeFor(session.staff.role, slug))
   return session
 }
 

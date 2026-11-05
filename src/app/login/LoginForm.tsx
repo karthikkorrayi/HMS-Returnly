@@ -10,7 +10,7 @@ import ReturnlyIcon from '@/components/ReturnlyIcon'
 //   1. the browser sends the username and password to Better Auth, which
 //      checks them, applies the sign-in rate limit and sets the session cookie;
 //   2. the server action finishSignIn checks the login belongs to an active
-//      staff member, then opens their page.
+//      staff member OF THIS HOTEL (the page's /h/<slug>), then opens their page.
 async function signIn(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const username = String(formData.get('username') ?? '').trim().toLowerCase()
   const password = String(formData.get('password') ?? '')
@@ -38,16 +38,17 @@ async function signIn(_prev: ActionState, formData: FormData): Promise<ActionSta
     return { error: 'Username or password is incorrect.' }
   }
 
-  return finishSignIn(formData.get('next'))
+  return finishSignIn(formData.get('next'), formData.get('hotel'))
 }
 
-export default function LoginForm({ next = '/items' }: { next?: string }) {
+export default function LoginForm({ next = '/items', hotel }: { next?: string; hotel: string }) {
   const [state, formAction, pending] = useActionState(signIn, initialActionState)
   const [showPassword, setShowPassword] = useState(false)
 
   return (
     <form action={formAction} className="space-y-4">
       <input type="hidden" name="next" value={next} />
+      <input type="hidden" name="hotel" value={hotel} />
       <div>
         <label htmlFor="username" className="label">Username</label>
         <input

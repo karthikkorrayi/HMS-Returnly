@@ -1,9 +1,12 @@
 'use server'
 
 import { redirect } from 'next/navigation'
-import { endCurrentSession } from '@/lib/auth'
+import { endCurrentSession, getSession } from '@/lib/auth'
+import { hotelLoginPath } from '@/lib/hotel-login'
 
+// Back to the hotel's own sign-in page.
 export async function signOut() {
+  const session = await getSession()
   await endCurrentSession()
-  redirect('/login')
+  redirect(session ? hotelLoginPath(session.property.slug) : '/login')
 }

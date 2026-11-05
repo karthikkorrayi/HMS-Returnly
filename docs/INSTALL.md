@@ -144,6 +144,14 @@ Run on a phone, on the environment's address. Made-up data only on staging.
 - [ ] `/h/<address>` opens the guest page with the hotel already chosen; "Hand in a found item" there has the hotel chosen too
 - [ ] change the address → the old `/h/…` shows "not found"; tracking links in earlier emails still work
 
+**Hotel sign-in, addresses and access log**
+- [ ] `/login` goes to `/h/<code>/login` (one hotel) or asks for the hotel code; a wrong code is refused and stays in the box
+- [ ] sign in on `/h/<code>/login` → `/h/<code>/items`; every menu link starts with `/h/<code>/`; no guest "Support" button on staff pages
+- [ ] an old bookmark (`/settings`) and another hotel's address (`/h/other/requests`) both land on your own hotel's page
+- [ ] a staff member of another hotel can't sign in on your hotel's page ("Username or password is incorrect")
+- [ ] sign out → your hotel's sign-in page
+- [ ] open a customer report → Settings → Access log shows your name, the reference and the time
+
 **Daily clean-up**
 - [ ] daily-cleanup run by hand → log ends `✓ done`; Settings shows "Last ran less than an hour ago"
 - [ ] the next morning: a scheduled run is in its log (03:30 UTC)

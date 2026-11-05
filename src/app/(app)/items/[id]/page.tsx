@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ITEM_ROLES, canManageItems, requireSession } from '@/lib/auth'
+import { staffPath } from '@/lib/staff-paths'
 import { withStaff } from '@/lib/db'
 import { loadItemDetail } from '@/lib/queries/item-detail'
 import { formatDate, formatDateTime, hotelToday } from '@/lib/format'
@@ -27,7 +28,7 @@ export default async function ItemPage({
   params: Promise<{ id: string }>
   searchParams: Promise<{ logged?: string; photos_failed?: string }>
 }) {
-  const { staff: me } = await requireSession(ITEM_ROLES)
+  const { staff: me, property } = await requireSession(ITEM_ROLES)
   const { id } = await params
   const flags = await searchParams
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound()
@@ -69,7 +70,7 @@ export default async function ItemPage({
 
   return (
     <div className="space-y-5">
-      <Link href="/items" className="text-sm font-semibold text-teal">← All items</Link>
+      <Link href={staffPath(property.slug, '/items')} className="text-sm font-semibold text-teal">← All items</Link>
 
       {flags.logged && (
         <div role="status" className="panel border-teal bg-teal-soft p-4">

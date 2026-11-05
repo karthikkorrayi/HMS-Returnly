@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import ReturnlyIcon from '@/components/ReturnlyIcon'
 import type { StaffRole } from '@/lib/types'
+import { useStaffPath } from '@/components/StaffHotel'
+import { withoutHotel } from '@/lib/staff-paths'
 
 type NavItem = {
   href: string
@@ -57,7 +59,10 @@ export default function Nav({
   role: StaffRole
   variant: 'rail' | 'bar'
 }) {
-  const pathname = usePathname()
+  // Menu paths are the pages (/items); links and the address bar are the
+  // hotel's (/h/<slug>/items).
+  const pathname = withoutHotel(usePathname())
+  const to = useStaffPath()
   const items = NAV[role] ?? []
 
   function isActive(href: string) {
@@ -80,7 +85,7 @@ export default function Nav({
         {items.map((item) => (
           <li key={item.href} className={variant === 'bar' ? 'flex-1' : ''}>
             <Link
-              href={item.href}
+              href={to(item.href)}
               aria-current={isActive(item.href) ? 'page' : undefined}
               className={variant === 'rail'
                 ? `flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold ${

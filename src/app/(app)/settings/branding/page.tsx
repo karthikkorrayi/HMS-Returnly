@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { requireSession } from '@/lib/auth'
+import { staffPath } from '@/lib/staff-paths'
 import { authBaseURL } from '@/lib/better-auth/instance'
 import { withStaff } from '@/lib/db'
 import { loadBranding, logoPath, MIN_CONTRAST } from '@/lib/branding'
@@ -9,13 +10,13 @@ import LogoUploader from './LogoUploader'
 
 // Managers: the hotel's web address, email colour, welcome line and logo.
 export default async function BrandingPage() {
-  const { staff } = await requireSession(['manager'])
+  const { staff, property } = await requireSession(['manager'])
   const b = await withStaff(staff.user_id, loadBranding)
   const origin = authBaseURL().replace(/\/+$/, '')
 
   return (
     <div className="mx-auto max-w-2xl space-y-5">
-      <Link href="/settings" className="text-sm font-semibold text-teal">← Settings</Link>
+      <Link href={staffPath(property.slug, '/settings')} className="text-sm font-semibold text-teal">← Settings</Link>
       <div>
         <h1 className="text-2xl font-bold">Branding</h1>
         <p className="hint mt-1">How {b.name} appears on its guest page and in emails to customers. Emails always come from Foundora’s address, with your hotel’s name.</p>

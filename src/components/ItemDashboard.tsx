@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import ReturnlyIcon from './ReturnlyIcon'
 import { StatusBadge, TierBadge } from './Badges'
+import { useStaffPath } from './StaffHotel'
 import type { StaffRole } from '@/lib/types'
 import {
   DASHBOARD_VIEWS,
@@ -44,6 +45,7 @@ export default function ItemDashboard({
   const preview = mode === 'preview'
   const router = useRouter()
   const [pending, startTransition] = useTransition()
+  const to = useStaffPath()
   const [localView, setLocalView] = useState<DashboardFilter>('open')
   const [query, setQuery] = useState(search)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -76,7 +78,7 @@ export default function ItemDashboard({
 
   function href(filter: DashboardFilter, targetPage = 1) {
     return {
-      pathname: '/items',
+      pathname: to('/items'),
       query: {
         view: filter,
         ...(search ? { q: search } : {}),
@@ -218,7 +220,7 @@ export default function ItemDashboard({
               </div>
             ) : (
               <form
-                action="/items"
+                action={to('/items')}
                 method="get"
                 role="search"
                 className="flex w-full gap-2 sm:w-auto"
@@ -378,10 +380,10 @@ export default function ItemDashboard({
                 </button>
               ) : (
                 <div className="mt-4 flex flex-wrap justify-center gap-2">
-                  <Link href="/items" className="btn btn-secondary">
+                  <Link href={to('/items')} className="btn btn-secondary">
                     Reset filters
                   </Link>
-                  <Link href="/items/new" className="btn btn-primary">
+                  <Link href={to('/items/new')} className="btn btn-primary">
                     Log an item
                   </Link>
                 </div>
@@ -469,7 +471,7 @@ export default function ItemDashboard({
               </Link>
             ) : selected ? (
               <Link
-                href={`/items/${selected.id}`}
+                href={to(`/items/${selected.id}`)}
                 className="btn btn-primary mt-5 w-full text-sm"
               >
                 Open item record{' '}

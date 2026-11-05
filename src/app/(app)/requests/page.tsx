@@ -5,7 +5,7 @@ import RequestList, { type ListParams } from './RequestList'
 
 // Admin: every customer enquiry for this hotel.
 export default async function CustomerRequestsPage({ searchParams }: { searchParams: Promise<ListParams> }) {
-  const { staff: me } = await requireSession(['manager'])
+  const { staff: me, property } = await requireSession(['manager'])
   const names = await withStaff(me.user_id, loadStaffNames)
 
   return (
@@ -17,7 +17,7 @@ export default async function CustomerRequestsPage({ searchParams }: { searchPar
           releasing the item still follows the item’s ID check and handover.
         </p>
       </div>
-      <RequestList basePath="/requests" params={await searchParams} names={names} meId={me.user_id} showAssigneeFilter />
+      <RequestList slug={property.slug} basePath="/requests" params={await searchParams} names={names} meId={me.user_id} showAssigneeFilter />
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { withStaff } from '@/lib/db'
 import { cleanRequestSearch, loadRequestList } from '@/lib/queries/requests'
+import { staffPath } from '@/lib/staff-paths'
 import { formatDateTime } from '@/lib/format'
 import { CATEGORY_LABEL } from '@/lib/types'
 import {
@@ -25,12 +26,15 @@ export type ListParams = { status?: string; q?: string; assigned?: string; p?: s
 // Row-level security already limits Support to requests assigned to them.
 export default async function RequestList({
   basePath,
+  slug,
   params,
   names,
   meId,
   showAssigneeFilter,
 }: {
   basePath: '/requests' | '/support'
+  /** The hotel's address: links are /h/<slug>/… */
+  slug: string
   params: ListParams
   names: Record<string, string>
   meId: string
@@ -71,7 +75,7 @@ export default async function RequestList({
     if (merged.assigned && merged.assigned !== 'any') sp.set('assigned', merged.assigned)
     if (over.p && over.p !== '1') sp.set('p', over.p)
     const s = sp.toString()
-    return s ? `${basePath}?${s}` : basePath
+    return staffPath(slug, s ? `${basePath}?${s}` : basePath)
   }
 
   const chips: { key: string; label: string; n: number }[] = [
@@ -151,7 +155,7 @@ export default async function RequestList({
         <ul className="panel divide-y divide-line">
           {rows.map((r) => (
             <li key={r.id}>
-              <Link href={`/requests/${r.id}`} className="grid gap-2 p-4 hover:bg-paper sm:grid-cols-[1fr_auto] sm:items-center">
+              <Link href={staffPath(slug, `/requests/${r.id}`)} className="grid gap-2 p-4 hover:bg-paper sm:grid-cols-[1fr_auto] sm:items-center">
                 <div className="min-w-0">
                   <p className="flex flex-wrap items-center gap-2">
                     <span className="font-bold">{r.reference}</span>
