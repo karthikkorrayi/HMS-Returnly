@@ -74,8 +74,8 @@ export default async function ItemPage({
 
       {flags.logged && (
         <div role="status" className="panel border-teal bg-teal-soft p-4">
-          <p className="font-semibold">Item logged. Write this code on the item’s tag:</p>
-          <p className="mt-3"><span className="tag tag-lg">{item.item_code}</span></p>
+          <p className="font-semibold">Item logged successfully.</p>
+          <p className="mt-2 hint">The item code is shown below. Write it on the item’s tag.</p>
           {flags.photos_failed && (
             <p className="mt-3 text-sm text-danger">
               {flags.photos_failed} photo(s) did not upload. Add them again below.

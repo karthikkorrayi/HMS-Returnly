@@ -1,9 +1,10 @@
 'use client'
 
+import type { ActionGroup } from '@/lib/action-groups'
 import { Modal } from '@/components/workspace/Modal'
 import MetricDetails from '@/components/workspace/MetricDetails'
 import { CATEGORIES, type ValueTier } from '@/lib/types'
-import { useState, useTransition } from 'react'
+import { useId, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import ReturnlyIcon from './ReturnlyIcon'
@@ -21,6 +22,7 @@ import {
 } from '@/lib/item-dashboard'
 
 type Props = {
+  groups?: ActionGroup[]
   mode: 'preview' | 'live'
   items: DashboardItem[]
   counts: DashboardCounts
@@ -46,9 +48,11 @@ export default function ItemDashboard({
   pageSize = 12,
   total = null,
   error = null,
+  groups = [],
   category = '',
   tier = '',
 }: Props) {
+  const uid = useId()
   const preview = mode === 'preview'
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -100,7 +104,7 @@ export default function ItemDashboard({
   return (
     <section
       id={preview ? 'workspace-preview' : 'hotel-dashboard'}
-      aria-labelledby="dashboard-title"
+      aria-labelledby={`${uid}-dashboard-title`}
       className={preview ? 'scroll-mt-6 pt-10' : ''}
     >
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
@@ -109,7 +113,7 @@ export default function ItemDashboard({
             {preview ? 'A calmer shift starts here' : 'Your shift, organised'}
           </p>
           <h2
-            id="dashboard-title"
+            id={`${uid}-dashboard-title`}
             className="text-2xl font-bold tracking-tight"
           >
             {preview
@@ -152,7 +156,7 @@ export default function ItemDashboard({
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="metric-selection"><h3 className="font-bold mb-3">Metrics selection</h3><div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {DASHBOARD_SUMMARIES.map((card) => {
           const content = (
             <>
@@ -183,20 +187,22 @@ export default function ItemDashboard({
         })}
       </div>
 
+      </div>
       <Modal open={metric !== null} title={DASHBOARD_SUMMARIES.find((c) => c.id === metric)?.label ?? 'Metric details'} onClose={() => setMetric(null)}>
         {metric && (preview ? <div><p className="hint">Sample data only.</p><p className="metric-total">{counts[metric] ?? '—'}</p><ul>{items.filter((i) => matchesDashboardFilter(i,metric)).map((i) => <li key={i.id} className="py-2">{i.description} · {i.location}</li>)}</ul></div> : <MetricDetails key={metric} metric={metric}/>)}
       </Modal>
+      {!preview && <section className="group-overview mt-6" aria-label="Action groups"><header><div><h3 className="font-bold">Action groups</h3><p className="hint">Shared work columns, independent of item status.</p></div><Link href={to('/items/organise')} className="btn btn-secondary">Manage groups</Link></header><div className="group-overview-columns">{groups.map((g)=><Link key={g.id} href={{pathname:to('/items/organise'),query:{group:g.id}}} className="group-overview-card"><strong>{g.title}</strong><span>{g.count} items</span><small>Open column →</small></Link>)}</div></section>}
       <div
         className={`mt-6 grid items-start gap-5 dashboard-board-stack ${pending ? 'opacity-70' : ''}`}
         aria-busy={pending}
       >
-        <div className="panel min-w-0 overflow-hidden">
+        <div className="panel action-board min-w-0 overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5">
             <h3 className="font-bold">The action board</h3>
 
             {preview ? (
               <div className="relative w-full sm:w-64">
-                <label htmlFor="dashboard-search" className="sr-only">
+                <label htmlFor={`${uid}-dashboard-search`} className="sr-only">
                   Search sample items
                 </label>
                 <ReturnlyIcon
@@ -204,7 +210,7 @@ export default function ItemDashboard({
                   className="absolute left-3 top-3 !size-4 text-muted"
                 />
                 <input
-                  id="dashboard-search"
+                  id={`${uid}-dashboard-search`}
                   type="search"
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
@@ -220,11 +226,11 @@ export default function ItemDashboard({
                 className="filter-toolbar item-search-form"
               >
                 <input type="hidden" name="view" value={activeView} />
-                <label htmlFor="dashboard-search" className="sr-only">
+                <label htmlFor={`${uid}-dashboard-search`} className="sr-only">
                   Room or item code
                 </label>
                 <input
-                  id="dashboard-search"
+                  id={`${uid}-dashboard-search`}
                   type="search"
                   name="q"
                   value={query}
@@ -233,10 +239,10 @@ export default function ItemDashboard({
                   placeholder="Room or item code"
                   maxLength={20}
                 />
-                <label className="sr-only" htmlFor="item-category">Category</label>
-                <select id="item-category" name="category" defaultValue={category} className="field !min-h-10 !text-sm"><option value="">All categories</option>{CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}</select>
-                <label className="sr-only" htmlFor="item-tier">Value tier</label>
-                <select id="item-tier" name="tier" defaultValue={tier} className="field !min-h-10 !text-sm"><option value="">All value tiers</option>{(['standard','valuable','sensitive'] as ValueTier[]).map((v) => <option key={v}>{v}</option>)}</select>
+                <label className="sr-only" htmlFor={`${uid}-item-category`}>Category</label>
+                <select id={`${uid}-item-category`} name="category" defaultValue={category} className="field !min-h-10 !text-sm"><option value="">All categories</option>{CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}</select>
+                <label className="sr-only" htmlFor={`${uid}-item-tier`}>Value tier</label>
+                <select id={`${uid}-item-tier`} name="tier" defaultValue={tier} className="field !min-h-10 !text-sm"><option value="">All value tiers</option>{(['standard','valuable','sensitive'] as ValueTier[]).map((v) => <option key={v}>{v}</option>)}</select>
                 <button className="btn btn-secondary !min-h-10 !text-sm">
                   Find
                 </button>
@@ -265,7 +271,7 @@ export default function ItemDashboard({
                     className={className}
                     onClick={() => chooseFilter(id)}
                     aria-pressed={activeView === id}
-                    aria-controls="dashboard-items"
+                    aria-controls={`${uid}-dashboard-items`}
                   >
                     {content}
                   </button>
@@ -290,7 +296,7 @@ export default function ItemDashboard({
             <span>Select for next step</span>
           </div>
 
-          <ul id="dashboard-items" className="divide-y divide-line">
+          <ul id={`${uid}-dashboard-items`} className="divide-y divide-line">
             {visible.map((item) => (
               <li key={item.id}>
                 <button
@@ -298,7 +304,7 @@ export default function ItemDashboard({
                   className={`preview-row ${selected?.id === item.id ? 'preview-row-selected' : ''}`}
                   onClick={() => setSelectedId(item.id)}
                   aria-pressed={selected?.id === item.id}
-                  aria-controls="dashboard-next-step"
+                  aria-controls={`${uid}-dashboard-next-step`}
                 >
                   <span
                     className={`flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl ${
@@ -431,16 +437,16 @@ export default function ItemDashboard({
           aria-label="Item guidance and quick actions"
         >
           <section
-            id="dashboard-next-step"
+            id={`${uid}-dashboard-next-step`}
             className="panel p-5"
-            aria-labelledby="next-step-title"
+            aria-labelledby={`${uid}-next-step-title`}
           >
             <p className="mb-4 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-teal">
               <ReturnlyIcon name="grid" className="!size-4" />
               {preview ? 'Preview / Next step' : 'Next step'}
             </p>
             <div aria-live="polite" aria-atomic="true">
-              <h3 id="next-step-title" className="text-lg font-bold">
+              <h3 id={`${uid}-next-step-title`} className="text-lg font-bold">
                 {selected ? selected.description : 'Choose an item'}
               </h3>
               {selected ? (

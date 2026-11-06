@@ -60,12 +60,12 @@ export default function WorkspaceShell({ staff, property, logoVersion, hasLogo, 
       <div className="sidebar-header"><Link href={to(homeForRole(staff.role))} aria-label={`${property.name} dashboard`}>{collapsed ? mark : logo}</Link>
         <button type="button" className="icon-button" aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'} aria-expanded={!collapsed} onClick={toggle}>{collapsed ? '»' : '«'}</button></div>
       <Nav role={staff.role} variant="rail" collapsed={collapsed} />
-      <div className="sidebar-footer"><Link href={to(staff.role === 'manager' ? '/settings/branding' : '/account')} aria-label={staff.role === 'manager' ? 'Configure hotel standalone logo' : `${property.name} account`}>{mark}</Link></div>
+      <div className="sidebar-footer"><Link href="/" aria-label="FoundOra guest services"><Brand /></Link></div>
     </aside>
     <div className="workspace-column">
       <header className="workspace-topbar">
-        <button type="button" className="icon-button mobile-menu-toggle" aria-label="Open navigation" aria-expanded={mobile} onClick={() => setMobile(true)}>☰</button>
-        <div className="workspace-hotel">{logo}<div><p className="font-bold">{property.name}</p><p className="hint">{property.inn_code} · Staff workspace</p></div></div>
+        <span className="mobile-header-logo">{logo}</span><button type="button" className="icon-button mobile-menu-toggle" aria-label="Open navigation" aria-expanded={mobile} onClick={() => setMobile(true)}>☰</button>
+        <div className="workspace-hotel"><div><p className="font-bold">{property.name}</p><p className="hint">{property.inn_code} · Staff workspace</p></div></div>
         <div className="workspace-account-actions"><ThemeToggle />
           <button type="button" className="icon-button notification-trigger" aria-label={`Notifications: ${count} unread`} onClick={() => { setNotifications(true); setItems(null); setError('') }}>
             <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M6 9a6 6 0 1 1 12 0c0 5 2 6.5 2 6.5H4S6 14 6 9Z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg>{count>0 && <span className="notification-count">{count>99?'99+':count}</span>}
@@ -76,7 +76,7 @@ export default function WorkspaceShell({ staff, property, logoVersion, hasLogo, 
       <main id="staff-main" className="workspace-main">{children}</main>
       <footer className="workspace-company-footer"><Brand /><span>FoundOra · Lost &amp; Found, Made Simple.</span><Link href="/">Guest services</Link></footer>
     </div>
-    <dialog ref={mobileDialog} className="mobile-navigation-dialog" aria-label="Navigation" onClose={() => setMobile(false)}><header className="workspace-dialog-header">{logo}<button type="button" className="icon-button" aria-label="Close navigation" onClick={() => setMobile(false)}>×</button></header><div onClick={(event) => { if ((event.target as Element).closest('a')) setMobile(false) }}><Nav role={staff.role} variant="rail" /></div><div className="sidebar-footer">{mark}</div></dialog>
+    <dialog ref={mobileDialog} className="mobile-navigation-dialog" aria-label="Navigation" onClose={() => setMobile(false)}><header className="workspace-dialog-header"><span className="font-bold">Navigation</span><button type="button" className="icon-button" aria-label="Close navigation" onClick={() => setMobile(false)}>×</button></header><div onClick={(event) => { if ((event.target as Element).closest('a')) setMobile(false) }}><Nav role={staff.role} variant="rail" /></div><div className="sidebar-footer"><Brand /></div></dialog>
     <Modal open={profile} title="Your profile" onClose={() => setProfile(false)}>
       <dl className="profile-details"><div><dt>Name</dt><dd>{staff.display_name}</dd></div><div><dt>Username</dt><dd>{staff.username}</dd></div><div><dt>Role</dt><dd>{ROLE_LABEL[staff.role]}</dd></div><div><dt>Hotel</dt><dd>{property.name} ({property.inn_code})</dd></div><div><dt>Account access</dt><dd>Active · This hotel only</dd></div></dl>
       <h3 className="font-bold mt-5">Your role can</h3><ul className="permission-list">{ROLE_PERMISSIONS.filter((p) => p.roles.includes(staff.role)).map((p) => <li key={p.what}>{p.what}{p.note && <span className="hint block">{p.note}</span>}</li>)}</ul>

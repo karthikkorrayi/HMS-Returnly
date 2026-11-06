@@ -2,7 +2,7 @@
 
 import Typing from '@/components/foundora/Typing'
 import { notify } from '@/components/foundora/Toast'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { ruleBasedAssistant, type ConversationState, type CustomerInput } from '@/lib/requests/assistant'
 import { submitReport } from '@/lib/requests/public-actions'
 import { CONFIRM_EMAIL_TEXT, emailTypoHint, isValidEmail, normaliseEmail } from '@/lib/requests/email'
@@ -16,6 +16,8 @@ const assistant = ruleBasedAssistant
 type Hotel = { inn_code: string; name: string }
 
 export default function EnquiryChat({ hotels, today }: { hotels: Hotel[]; today: string }) {
+  const uid = useId()
+  const fieldId = (name: string) => `${uid}-${name}`
   const [conv, setConv] = useState<ConversationState>(() => assistant.start(today))
   const [text, setText] = useState('')
   const [hotel, setHotel] = useState(hotels.length === 1 ? hotels[0].inn_code : '')
@@ -102,7 +104,7 @@ export default function EnquiryChat({ hotels, today }: { hotels: Hotel[]; today:
     if ((conv.draft.description ?? '').trim().length < 3) next.description = 'Describe the item.'
     setErrors(next)
     if (Object.keys(next).length) {
-      document.getElementById(`enq-${Object.keys(next)[0]}`)?.focus()
+      document.getElementById(fieldId(`enq-${Object.keys(next)[0]}`))?.focus()
       return
     }
     setSubmitError(null)
@@ -168,25 +170,25 @@ export default function EnquiryChat({ hotels, today }: { hotels: Hotel[]; today:
         <legend className="sr-only">Your booking</legend>
         {hotels.length > 1 ? (
           <div>
-            <label htmlFor="enq-hotel" className="label">Hotel</label>
-            <select id="enq-hotel" className="field" value={hotel} onChange={(e) => { setHotel(e.target.value); setConfirming(false) }} aria-invalid={!!errors.hotel} aria-describedby={errors.hotel ? 'enq-hotel-err' : undefined}>
+            <label htmlFor={fieldId('enq-hotel')} className="label">Hotel</label>
+            <select id={fieldId('enq-hotel')} className="field" value={hotel} onChange={(e) => { setHotel(e.target.value); setConfirming(false) }} aria-invalid={!!errors.hotel} aria-describedby={errors.hotel ? fieldId('enq-hotel-err') : undefined}>
               <option value="">Choose…</option>
               {hotels.map((h) => <option key={h.inn_code} value={h.inn_code}>{h.name}</option>)}
             </select>
-            {errors.hotel && <p id="enq-hotel-err" className="mt-1 text-sm text-danger">{errors.hotel}</p>}
+            {errors.hotel && <p id={fieldId('enq-hotel-err')} className="mt-1 text-sm text-danger">{errors.hotel}</p>}
           </div>
         ) : null}
         <div>
-          <label htmlFor="enq-name" className="label">Your name</label>
-          <input id="enq-name" className="field" autoComplete="name" value={name} onChange={(e) => { setName(e.target.value); setConfirming(false) }} maxLength={80} aria-invalid={!!errors.name} aria-describedby={errors.name ? 'enq-name-err' : undefined} />
-          {errors.name && <p id="enq-name-err" className="mt-1 text-sm text-danger">{errors.name}</p>}
+          <label htmlFor={fieldId('enq-name')} className="label">Your name</label>
+          <input id={fieldId('enq-name')} className="field" autoComplete="name" value={name} onChange={(e) => { setName(e.target.value); setConfirming(false) }} maxLength={80} aria-invalid={!!errors.name} aria-describedby={errors.name ? fieldId('enq-name-err') : undefined} />
+          {errors.name && <p id={fieldId('enq-name-err')} className="mt-1 text-sm text-danger">{errors.name}</p>}
         </div>
         <div>
-          <label htmlFor="enq-booking" className="label">Booking ID</label>
-          <input id="enq-booking" className="field" autoCapitalize="characters" autoComplete="off" value={booking} onChange={(e) => { setBooking(e.target.value); setConfirming(false) }} maxLength={40} aria-invalid={!!errors.booking} aria-describedby={errors.booking ? 'enq-booking-err' : 'enq-booking-hint'} />
+          <label htmlFor={fieldId('enq-booking')} className="label">Booking ID</label>
+          <input id={fieldId('enq-booking')} className="field" autoCapitalize="characters" autoComplete="off" value={booking} onChange={(e) => { setBooking(e.target.value); setConfirming(false) }} maxLength={40} aria-invalid={!!errors.booking} aria-describedby={errors.booking ? fieldId('enq-booking-err') : fieldId('enq-booking-hint')} />
           {errors.booking
-            ? <p id="enq-booking-err" className="mt-1 text-sm text-danger">{errors.booking}</p>
-            : <p id="enq-booking-hint" className="hint mt-1">On your confirmation email.</p>}
+            ? <p id={fieldId('enq-booking-err')} className="mt-1 text-sm text-danger">{errors.booking}</p>
+            : <p id={fieldId('enq-booking-hint')} className="hint mt-1">On your confirmation email.</p>}
         </div>
       </fieldset>
 
@@ -200,10 +202,10 @@ export default function EnquiryChat({ hotels, today }: { hotels: Hotel[]; today:
             >
               <span className="sr-only">{m.from === 'customer' ? 'You: ' : 'Assistant: '}</span>
               {editing === m.id ? <div className="space-y-2">
-                <label className="label" htmlFor="edit-enquiry">Edit your answer</label>
+                <label className="label" htmlFor={fieldId('edit-enquiry')}>Edit your answer</label>
                 {editBefore?.input === 'choices'
-                  ? <select id="edit-enquiry" className="field" value={editText} onChange={(e) => setEditText(e.target.value)}>{editBefore?.quickReplies.map((q) => <option key={q.value} value={q.value}>{q.label}</option>)}</select>
-                  : <input id="edit-enquiry" className="field" type={editBefore?.input === 'date' ? 'date' : 'text'} maxLength={1000} value={editText} onChange={(e) => setEditText(e.target.value)} />}
+                  ? <select id={fieldId('edit-enquiry')} className="field" value={editText} onChange={(e) => setEditText(e.target.value)}>{editBefore?.quickReplies.map((q) => <option key={q.value} value={q.value}>{q.label}</option>)}</select>
+                  : <input id={fieldId('edit-enquiry')} className="field" type={editBefore?.input === 'date' ? 'date' : 'text'} maxLength={1000} value={editText} onChange={(e) => setEditText(e.target.value)} />}
                 <p className="text-xs">Updating this answer replaces the following questions and answers. Booking details are kept.</p>
                 <button type="button" className="btn btn-secondary" onClick={() => saveEdit(m.id)}>Update answer</button>{' '}
                 <button type="button" className="underline" onClick={() => setEditing(null)}>Cancel</button>
@@ -234,12 +236,12 @@ export default function EnquiryChat({ hotels, today }: { hotels: Hotel[]; today:
           )}
           {conv.input !== 'choices' && (
             <form onSubmit={onSend} className="flex gap-2">
-              <label htmlFor="enq-input" className="sr-only">
+              <label htmlFor={fieldId('enq-input')} className="sr-only">
                 {conv.input === 'date' ? 'Date you last had it' : 'Your answer'}
               </label>
               <input
                 ref={inputRef}
-                id="enq-input"
+                id={fieldId('enq-input')}
                 className="field"
                 type={conv.input === 'date' ? 'date' : 'text'}
                 max={conv.input === 'date' ? today : undefined}
@@ -262,48 +264,48 @@ export default function EnquiryChat({ hotels, today }: { hotels: Hotel[]; today:
           <h3 className="font-bold">Your enquiry</h3>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label htmlFor="enq-itemName" className="label">Item</label>
-              <input id="enq-itemName" className="field" value={conv.draft.itemName} onChange={(e) => updateDraft('itemName', e.target.value)} maxLength={80} aria-invalid={!!errors.itemName} />
+              <label htmlFor={fieldId('enq-itemName')} className="label">Item</label>
+              <input id={fieldId('enq-itemName')} className="field" value={conv.draft.itemName} onChange={(e) => updateDraft('itemName', e.target.value)} maxLength={80} aria-invalid={!!errors.itemName} />
               {errors.itemName && <p className="mt-1 text-sm text-danger">{errors.itemName}</p>}
             </div>
             <div>
-              <label htmlFor="enq-category" className="label">Type</label>
-              <select id="enq-category" className="field" value={conv.draft.category ?? ''} onChange={(e) => updateDraft('category', e.target.value)}>
+              <label htmlFor={fieldId('enq-category')} className="label">Type</label>
+              <select id={fieldId('enq-category')} className="field" value={conv.draft.category ?? ''} onChange={(e) => updateDraft('category', e.target.value)}>
                 <option value="">Not sure</option>
                 {CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
               </select>
             </div>
             <div>
-              <label htmlFor="enq-colour" className="label">Colour <span className="font-normal text-muted">(optional)</span></label>
-              <input id="enq-colour" className="field" value={conv.draft.colour ?? ''} onChange={(e) => updateDraft('colour', e.target.value)} maxLength={40} />
+              <label htmlFor={fieldId('enq-colour')} className="label">Colour <span className="font-normal text-muted">(optional)</span></label>
+              <input id={fieldId('enq-colour')} className="field" value={conv.draft.colour ?? ''} onChange={(e) => updateDraft('colour', e.target.value)} maxLength={40} />
             </div>
             <div>
-              <label htmlFor="enq-brand" className="label">Brand <span className="font-normal text-muted">(optional)</span></label>
-              <input id="enq-brand" className="field" value={conv.draft.brand ?? ''} onChange={(e) => updateDraft('brand', e.target.value)} maxLength={60} />
+              <label htmlFor={fieldId('enq-brand')} className="label">Brand <span className="font-normal text-muted">(optional)</span></label>
+              <input id={fieldId('enq-brand')} className="field" value={conv.draft.brand ?? ''} onChange={(e) => updateDraft('brand', e.target.value)} maxLength={60} />
             </div>
             <div>
-              <label htmlFor="enq-where" className="label">Where <span className="font-normal text-muted">(optional)</span></label>
-              <input id="enq-where" className="field" value={conv.draft.lostLocation ?? ''} onChange={(e) => updateDraft('lostLocation', e.target.value)} maxLength={80} />
+              <label htmlFor={fieldId('enq-where')} className="label">Where <span className="font-normal text-muted">(optional)</span></label>
+              <input id={fieldId('enq-where')} className="field" value={conv.draft.lostLocation ?? ''} onChange={(e) => updateDraft('lostLocation', e.target.value)} maxLength={80} />
             </div>
             <div>
-              <label htmlFor="enq-date" className="label">When <span className="font-normal text-muted">(optional)</span></label>
-              <input id="enq-date" type="date" className="field" max={today} value={conv.draft.lostDate ?? ''} onChange={(e) => updateDraft('lostDate', e.target.value)} />
+              <label htmlFor={fieldId('enq-date')} className="label">When <span className="font-normal text-muted">(optional)</span></label>
+              <input id={fieldId('enq-date')} type="date" className="field" max={today} value={conv.draft.lostDate ?? ''} onChange={(e) => updateDraft('lostDate', e.target.value)} />
             </div>
           </div>
           <div>
-            <label htmlFor="enq-description" className="label">Description</label>
-            <textarea id="enq-description" className="field min-h-24" value={conv.draft.description} onChange={(e) => updateDraft('description', e.target.value)} maxLength={1000} aria-invalid={!!errors.description} />
+            <label htmlFor={fieldId('enq-description')} className="label">Description</label>
+            <textarea id={fieldId('enq-description')} className="field min-h-24" value={conv.draft.description} onChange={(e) => updateDraft('description', e.target.value)} maxLength={1000} aria-invalid={!!errors.description} />
             <p className="hint mt-1">Include anything only the owner would know — an engraving, what’s inside, a scratch. Don’t include card or passport numbers.</p>
             {errors.description && <p className="mt-1 text-sm text-danger">{errors.description}</p>}
           </div>
           <div>
-            <label htmlFor="enq-email" className="label">Your email</label>
-            <input id="enq-email" type="email" inputMode="email" autoComplete="email" className="field" value={email}
+            <label htmlFor={fieldId('enq-email')} className="label">Your email</label>
+            <input id={fieldId('enq-email')} type="email" inputMode="email" autoComplete="email" className="field" value={email}
               onChange={(e) => { setEmail(e.target.value); setConfirming(false) }} maxLength={254}
-              aria-invalid={!!errors.email} aria-describedby={errors.email ? 'enq-email-err' : 'enq-email-hint'} />
+              aria-invalid={!!errors.email} aria-describedby={errors.email ? fieldId('enq-email-err') : fieldId('enq-email-hint')} />
             {errors.email
-              ? <p id="enq-email-err" className="mt-1 text-sm text-danger">{errors.email}</p>
-              : <p id="enq-email-hint" className="hint mt-1">For your reference ID and status updates only.</p>}
+              ? <p id={fieldId('enq-email-err')} className="mt-1 text-sm text-danger">{errors.email}</p>
+              : <p id={fieldId('enq-email-hint')} className="hint mt-1">For your reference ID and status updates only.</p>}
           </div>
           {submitError && <p role="alert" className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{submitError}</p>}
           {confirming ? (
@@ -313,7 +315,7 @@ export default function EnquiryChat({ hotels, today }: { hotels: Hotel[]; today:
               hint={emailTypoHint(email)}
               busy={submitting}
               onYes={onConfirmed}
-              onChange={() => { setConfirming(false); requestAnimationFrame(() => document.getElementById('enq-email')?.focus()) }}
+              onChange={() => { setConfirming(false); requestAnimationFrame(() => document.getElementById(fieldId('enq-email'))?.focus()) }}
             />
           ) : (
             <div className="flex flex-wrap items-center gap-3">

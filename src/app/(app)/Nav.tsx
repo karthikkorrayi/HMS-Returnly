@@ -35,6 +35,7 @@ const NAV: Record<StaffRole, NavItem[]> = {
   manager: [
     { href: '/items', label: 'Dashboard', icon: 'grid' },
     { href: '/items/new', label: 'Log item', icon: 'plus' },
+    { href: '/items/organise', label: 'Action groups', icon: 'grid' },
     { href: '/requests', label: 'Requests', icon: 'chat' },
     { href: '/staff', label: 'Staff', icon: 'people' },
     { href: '/settings', label: 'Settings', icon: 'gear' },
@@ -42,10 +43,12 @@ const NAV: Record<StaffRole, NavItem[]> = {
   front_office: [
     { href: '/items', label: 'Dashboard', icon: 'grid' },
     { href: '/items/new', label: 'Log item', icon: 'plus' },
+    { href: '/items/organise', label: 'Action groups', icon: 'grid' },
   ],
   housekeeping: [
     { href: '/items', label: 'Dashboard', icon: 'grid' },
     { href: '/items/new', label: 'Log item', icon: 'plus' },
+    { href: '/items/organise', label: 'Action groups', icon: 'grid' },
   ],
   support: [
     { href: '/support', label: 'Support requests', icon: 'inbox' },
@@ -69,7 +72,7 @@ export default function Nav({
 
   function isActive(href: string) {
     if (href === '/items') {
-      return pathname === '/items' || (pathname.startsWith('/items/') && pathname !== '/items/new')
+      return pathname === '/items' || (pathname.startsWith('/items/') && pathname !== '/items/new' && pathname !== '/items/organise')
     }
     // A request opened from Support requests keeps that tab highlighted.
     if (href === '/support') return pathname === '/support' || (role === 'support' && pathname.startsWith('/requests/'))

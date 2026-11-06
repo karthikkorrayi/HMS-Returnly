@@ -1,3 +1,4 @@
+import { loadGroupCounts } from '@/lib/action-groups'
 import { redirect } from 'next/navigation'
 import { ITEM_ROLES, requireSession } from '@/lib/auth'
 import { staffPath } from '@/lib/staff-paths'
@@ -85,6 +86,7 @@ export default async function ItemsPage({
     }
   })
 
+  const groups = await withStaff(staff.user_id, loadGroupCounts)
   const errors: string[] = []
   if (!result) errors.push('Could not load items. Try refreshing the dashboard. Summary counts are shown as —.')
 
@@ -106,6 +108,7 @@ export default async function ItemsPage({
         mode="live"
         items={items}
         counts={counts}
+        groups={groups}
         role={staff.role}
         view={selectedView.id}
         search={q}
