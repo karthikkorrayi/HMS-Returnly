@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { MAX_PHOTOS, uploadItemPhotos } from '@/lib/photos'
 import { saveItem } from './actions'
@@ -26,6 +26,9 @@ export default function LogItemForm({
   initialRoom?: string
   roomCheckId?: string
 }) {
+  const uid = useId()
+  const fieldId = (name: string) => `${uid}-${name}`
+  const [completion, setCompletion] = useState({location:Boolean(initialRoom),details:false})
   const router = useRouter()
   const to = useStaffPath()
   const roomSet = useMemo(() => new Set(rooms.map((r) => r.toUpperCase())), [rooms])
@@ -39,6 +42,7 @@ export default function LogItemForm({
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
+    if (busy) return
     setError(null)
     const form = new FormData(e.currentTarget)
     const get = (k: string) => String(form.get(k) ?? '').trim()
@@ -60,6 +64,7 @@ export default function LogItemForm({
     }
 
     setBusy('Saving item…')
+    try {
     const saved = await saveItem({
       areaType,
       roomNumber: areaType === 'room' ? rooms.find((r) => r.toUpperCase() === room) ?? null : null,
@@ -91,11 +96,19 @@ export default function LogItemForm({
 
     router.push(to(`/items/${item.id}?logged=1${photoNote}`))
     router.refresh()
+    } catch { setBusy(null); setError('The save could not be confirmed. Check the dashboard before trying again. Your entered details are kept here.') }
   }
 
   return (
-    <form onSubmit={onSubmit} className="mt-6 space-y-6">
-      <fieldset className="panel space-y-4 p-4">
+    <form onSubmit={onSubmit} className="mt-6 space-y-6 interactive-item-form" onChange={(e)=>{
+      const f=new FormData(e.currentTarget)
+      const room=String(f.get('room_number')??'').toUpperCase().trim()
+      setCompletion({location:areaType==='room'?roomSet.has(room):Boolean(String(f.get('area_label')??'').trim()),details:Boolean(f.get('category'))&&String(f.get('description')??'').trim().length>=3})
+    }}>
+      <nav className="form-step-navigation" aria-label="Item form sections">{[{id:'location',label:'1. Location',done:completion.location},{id:'details',label:'2. Item details',done:completion.details}].map((step)=><button type="button" key={step.id} className={step.done?'is-complete':''} onClick={()=>{
+        const section=document.getElementById(fieldId(step.id));section?.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'center'});section?.querySelector<HTMLElement>('input,select,textarea')?.focus({preventScroll:true})
+      }}>{step.label}<span>{step.done?'Ready':'Required'}</span></button>)}</nav>
+      <fieldset id={fieldId('location')} disabled={Boolean(busy)} className="panel space-y-4 p-4">
         <legend className="sr-only">Where it was found</legend>
         <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Where it was found">
           {(['room', 'public_area'] as const).map((t) => (
@@ -104,7 +117,7 @@ export default function LogItemForm({
               type="button"
               role="radio"
               aria-checked={areaType === t}
-              onClick={() => setAreaType(t)}
+              onClick={() => {setAreaType(t);setCompletion((old)=>({...old,location:false}))}}
               disabled={Boolean(roomCheckId) && t !== 'room'}
               className={`btn ${areaType === t ? 'btn-primary' : 'btn-secondary'}`}
             >
@@ -115,11 +128,11 @@ export default function LogItemForm({
 
         {areaType === 'room' ? (
           <div>
-            <label htmlFor="room_number" className="label">Room number</label>
+            <label htmlFor={fieldId('room_number')} className="label">Room number</label>
             <input
-              id="room_number"
+              id={fieldId('room_number')}
               name="room_number"
-              list="room-list"
+              list={fieldId('room-list')}
               className="field"
               inputMode="numeric"
               autoComplete="off"
@@ -127,24 +140,24 @@ export default function LogItemForm({
               readOnly={Boolean(roomCheckId)}
               required
             />
-            <datalist id="room-list">
+            <datalist id={fieldId('room-list')}>
               {rooms.map((r) => (
                 <option key={r} value={r} />
               ))}
             </datalist>
-            <label htmlFor="found_spot" className="label mt-4">
+            <label htmlFor={fieldId('found_spot')} className="label mt-4">
               Where in the room <span className="font-normal text-muted">(optional)</span>
             </label>
             <input
-              id="found_spot"
+              id={fieldId('found_spot')}
               name="found_spot"
-              list="spot-list"
+              list={fieldId('spot-list')}
               className="field"
               maxLength={80}
               autoComplete="off"
               placeholder="e.g. Behind the bedside table"
             />
-            <datalist id="spot-list">
+            <datalist id={fieldId('spot-list')}>
               {['Bedside table', 'Behind the bedside table', 'Under the bed', 'In the bed / sheets', 'Wardrobe', 'Drawers', 'Room safe', 'Desk', 'Bathroom', 'Behind the door'].map((s) => (
                 <option key={s} value={s} />
               ))}
@@ -159,17 +172,17 @@ export default function LogItemForm({
           </div>
         ) : (
           <div>
-            <label htmlFor="area_label" className="label">Area</label>
+            <label htmlFor={fieldId('area_label')} className="label">Area</label>
             <input
-              id="area_label"
+              id={fieldId('area_label')}
               name="area_label"
-              list="area-list"
+              list={fieldId('area-list')}
               className="field"
               maxLength={60}
               autoComplete="off"
               required
             />
-            <datalist id="area-list">
+            <datalist id={fieldId('area-list')}>
               {areas.map((a) => (
                 <option key={a} value={a} />
               ))}
@@ -178,9 +191,9 @@ export default function LogItemForm({
         )}
 
         <div>
-          <label htmlFor="found_at" className="label">When it was found</label>
+          <label htmlFor={fieldId('found_at')} className="label">When it was found</label>
           <input
-            id="found_at"
+            id={fieldId('found_at')}
             name="found_at"
             type="datetime-local"
             className="field"
@@ -191,11 +204,11 @@ export default function LogItemForm({
         </div>
       </fieldset>
 
-      <fieldset className="panel space-y-4 p-4">
+      <fieldset id={fieldId('details')} disabled={Boolean(busy)} className="panel space-y-4 p-4">
         <legend className="sr-only">What it is</legend>
         <div>
-          <label htmlFor="category" className="label">Type of item</label>
-          <select id="category" name="category" className="field" required defaultValue="">
+          <label htmlFor={fieldId('category')} className="label">Type of item</label>
+          <select id={fieldId('category')} name="category" className="field" required defaultValue="">
             <option value="" disabled>Choose…</option>
             {CATEGORIES.map((c) => (
               <option key={c.value} value={c.value}>{c.label}</option>
@@ -203,9 +216,9 @@ export default function LogItemForm({
           </select>
         </div>
         <div>
-          <label htmlFor="description" className="label">Description</label>
+          <label htmlFor={fieldId('description')} className="label">Description</label>
           <textarea
-            id="description"
+            id={fieldId('description')}
             name="description"
             className="field min-h-24"
             minLength={3}
@@ -217,17 +230,17 @@ export default function LogItemForm({
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label htmlFor="brand" className="label">Brand <span className="font-normal text-muted">(optional)</span></label>
-            <input id="brand" name="brand" className="field" maxLength={60} />
+            <label htmlFor={fieldId('brand')} className="label">Brand <span className="font-normal text-muted">(optional)</span></label>
+            <input id={fieldId('brand')} name="brand" className="field" maxLength={60} />
           </div>
           <div>
-            <label htmlFor="colour" className="label">Colour <span className="font-normal text-muted">(optional)</span></label>
-            <input id="colour" name="colour" className="field" maxLength={40} />
+            <label htmlFor={fieldId('colour')} className="label">Colour <span className="font-normal text-muted">(optional)</span></label>
+            <input id={fieldId('colour')} name="colour" className="field" maxLength={40} />
           </div>
         </div>
       </fieldset>
 
-      <fieldset className="panel space-y-3 p-4">
+      <fieldset disabled={Boolean(busy)} className="panel space-y-3 p-4">
         <legend className="label float-left mb-2 w-full">How valuable is it?</legend>
         {(['standard', 'valuable', 'sensitive'] as const).map((t) => (
           <label

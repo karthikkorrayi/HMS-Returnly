@@ -1,4 +1,5 @@
 'use client'
+import { useId } from 'react'
 
 // "Is this your correct email address?" — shown before a report is sent. The
 // report is only sent after "Yes, send"; "Change it" goes back to the field.
@@ -18,11 +19,12 @@ export default function EmailConfirm({
   onYes: () => void
   onChange: () => void
 }) {
+  const uid = useId()
   return (
-    <div role="alertdialog" aria-labelledby="email-confirm-q" aria-describedby="email-confirm-addr"
+    <div role="alertdialog" aria-labelledby={`${uid}-question`} aria-describedby={`${uid}-address`}
       className="rounded-xl border border-teal bg-teal-soft p-4">
-      <p id="email-confirm-q" className="font-semibold">{question}</p>
-      <p id="email-confirm-addr" className="mt-2 break-all text-lg font-bold">{email}</p>
+      <p id={`${uid}-question`} className="font-semibold">{question}</p>
+      <p id={`${uid}-address`} className="mt-2 break-all text-lg font-bold">{email}</p>
       {hint && <p className="mt-1 text-sm text-attention">{hint}</p>}
       <div className="mt-3 flex flex-wrap gap-3">
         <button type="button" className="btn btn-primary" onClick={onYes} disabled={busy} autoFocus>

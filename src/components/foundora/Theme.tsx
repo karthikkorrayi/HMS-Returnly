@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react'
 
-export const themeInit = `(function(){try{var t=localStorage.getItem('foundora-theme');document.documentElement.dataset.theme=t==='light'||t==='dark'?t:(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')}catch(e){document.documentElement.dataset.theme=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}})()`
+export const themeInit = `(function(){var t='dark';try{var saved=localStorage.getItem('foundora-theme');if(saved==='light'||saved==='dark')t=saved}catch(e){}document.documentElement.dataset.theme=t})()`
 
 export default function ThemeToggle() {
-  const [theme, setTheme] = useState<'light' | 'dark' | null>(null)
+  const [theme, setTheme] = useState<'light' | 'dark' | null>('dark')
   useEffect(() => {
     const sync = () =>
       setTheme(
@@ -22,28 +22,11 @@ export default function ThemeToggle() {
         document.documentElement.dataset.theme =
           event.newValue === 'light' || event.newValue === 'dark'
             ? event.newValue
-            : matchMedia('(prefers-color-scheme: dark)').matches
-              ? 'dark'
-              : 'light'
+            : 'dark'
     }
-    const media = matchMedia('(prefers-color-scheme: dark)')
-    const onSystem = () => {
-      let saved: string | null = null
-      try {
-        saved = localStorage.getItem('foundora-theme')
-      } catch {
-        /* Storage can be disabled. */
-      }
-      if (saved !== 'light' && saved !== 'dark')
-        document.documentElement.dataset.theme = media.matches
-          ? 'dark'
-          : 'light'
-    }
-    media.addEventListener('change', onSystem)
     window.addEventListener('storage', onStorage)
     return () => {
       observer.disconnect()
-      media.removeEventListener('change', onSystem)
       window.removeEventListener('storage', onStorage)
     }
   }, [])

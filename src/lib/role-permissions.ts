@@ -7,6 +7,7 @@ import type { StaffRole } from '@/lib/types'
 export const ROLE_ORDER: StaffRole[] = ['housekeeping', 'front_office', 'support', 'manager']
 
 export const ROLE_PERMISSIONS: { what: string; roles: StaffRole[]; note?: string }[] = [
+  { what: 'Organise item cards into work groups without changing custody status', roles: ['housekeeping','front_office','manager'], note: 'Managers create, rename and arrange groups.' },
   { what: 'Log found items, add photos, put items in storage', roles: ['housekeeping', 'front_office', 'manager'] },
   { what: 'Match items to guests, contact guests, arrange collection or posting, hand items over', roles: ['front_office', 'manager'] },
   { what: 'Change how valuable an item is', roles: ['front_office', 'manager'] },
