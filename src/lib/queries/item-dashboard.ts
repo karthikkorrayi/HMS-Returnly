@@ -20,6 +20,8 @@ export type DashboardQuery = {
   view: DashboardFilter
   /** Already cleaned: letters, digits and dashes only, at most 20 characters. */
   search: string
+  category?: string
+  tier?: string
   page: number
   pageSize: number
   /** The hotel's today, 'YYYY-MM-DD'. */
@@ -38,11 +40,13 @@ export async function loadDashboard(tx: Tx, q: DashboardQuery): Promise<{ rows: 
   // $1 property, $2 statuses, $3 today (retention only), $4 search (optional)
   // Status lists are passed as one comma-separated string (portable to every
   // Postgres driver) and turned into an enum array in SQL.
-  const params: unknown[] = [q.propertyId, view.statuses.join(','), retention ? q.today : null, q.search || null]
+  const params: unknown[] = [q.propertyId, view.statuses.join(','), retention ? q.today : null, q.search || null, q.category || null, q.tier || null]
   const where = `i.property_id = $1
       and i.status = any(string_to_array($2::text, ',')::public.item_status[])
       and ($3::date is null or i.dispose_after < $3::date)
-      and ($4::text is null or i.room_number = $4 or i.item_code ilike '%' || $4 || '%')`
+      and ($4::text is null or i.room_number = $4 or i.item_code ilike '%' || $4 || '%')
+      and ($5::text is null or i.category::text = $5)
+      and ($6::text is null or i.value_tier::text = $6)`
 
   const total = (await tx.query<{ n: number }>(`select count(*)::int as n from public.lost_items i where ${where}`, params)).rows[0].n
 
@@ -58,7 +62,7 @@ export async function loadDashboard(tx: Tx, q: DashboardQuery): Promise<{ rows: 
          from public.lost_items i
         where ${where}
         order by ${order}, i.id asc
-        limit $5 offset $6`,
+        limit $7 offset $8`,
       [...params, q.pageSize, (q.page - 1) * q.pageSize]
     )
   ).rows

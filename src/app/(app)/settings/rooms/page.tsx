@@ -1,3 +1,4 @@
+import EditPanel from '@/components/workspace/EditPanel'
 import Link from 'next/link'
 import { requireSession } from '@/lib/auth'
 import { staffPath } from '@/lib/staff-paths'
@@ -40,7 +41,7 @@ export default async function RoomsPage() {
         </p>
       </div>
 
-      <section className="panel space-y-3 p-4 sm:p-5">
+      <section className="panel space-y-3 p-4 sm:p-5"><EditPanel label="Rooms configuration">
         <h2 className="text-lg font-semibold">Change a room</h2>
         <p className="hint">Type a room number and choose what to do. A room with items recorded can be retired but not deleted.</p>
         <InlineAction action={changeRoomAction} submitLabel="Apply" variant="primary" okText="Done" resetOnOk>
@@ -58,10 +59,10 @@ export default async function RoomsPage() {
             </select>
           </div>
         </InlineAction>
-      </section>
+      </EditPanel></section>
 
       {floors.map((f) => (
-        <section key={f.id} className="panel space-y-4 p-4 sm:p-5">
+        <section key={f.id} className="panel space-y-4 p-4 sm:p-5"><EditPanel label="Rooms configuration">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <h2 className="text-lg font-semibold">Floor {f.name}</h2>
             {f.rooms.length === 0 && (
@@ -84,18 +85,18 @@ export default async function RoomsPage() {
               </div>
             </InlineAction>
           </div>
-        </section>
+        </EditPanel></section>
       ))}
 
       {unassigned.length > 0 && (
-        <section className="panel space-y-3 p-4 sm:p-5">
+        <section className="panel space-y-3 p-4 sm:p-5"><EditPanel label="Rooms configuration">
           <h2 className="text-lg font-semibold">Rooms without a floor</h2>
           <p className="hint">Use “Change a room → Move to floor …” above to place them.</p>
           <Rooms rooms={unassigned} />
-        </section>
+        </EditPanel></section>
       )}
 
-      <section className="panel space-y-3 p-4 sm:p-5">
+      <section className="panel space-y-3 p-4 sm:p-5"><EditPanel label="Rooms configuration">
         <h2 className="text-lg font-semibold">Add a floor</h2>
         <InlineAction action={addFloorAction} submitLabel="Add floor" variant="primary" resetOnOk>
           <div className="w-40">
@@ -103,7 +104,7 @@ export default async function RoomsPage() {
             <input id="new-floor" name="name" className="field" maxLength={20} placeholder="e.g. 5 or Roof" required />
           </div>
         </InlineAction>
-      </section>
+      </EditPanel></section>
     </div>
   )
 }

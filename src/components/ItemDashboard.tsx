@@ -1,5 +1,8 @@
 'use client'
 
+import { Modal } from '@/components/workspace/Modal'
+import MetricDetails from '@/components/workspace/MetricDetails'
+import { CATEGORIES, type ValueTier } from '@/lib/types'
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -28,6 +31,8 @@ type Props = {
   pageSize?: number
   total?: number | null
   error?: string | null
+  category?: string
+  tier?: string
 }
 
 export default function ItemDashboard({
@@ -41,6 +46,8 @@ export default function ItemDashboard({
   pageSize = 12,
   total = null,
   error = null,
+  category = '',
+  tier = '',
 }: Props) {
   const preview = mode === 'preview'
   const router = useRouter()
@@ -48,6 +55,7 @@ export default function ItemDashboard({
   const to = useStaffPath()
   const [localView, setLocalView] = useState<DashboardFilter>('open')
   const [query, setQuery] = useState(search)
+  const [metric, setMetric] = useState<DashboardFilter | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const activeView = preview ? localView : view
@@ -81,6 +89,8 @@ export default function ItemDashboard({
       pathname: to('/items'),
       query: {
         view: filter,
+        ...(category ? { category } : {}),
+        ...(tier ? { tier } : {}),
         ...(search ? { q: search } : {}),
         ...(targetPage > 1 ? { p: String(targetPage) } : {}),
       },
@@ -130,7 +140,7 @@ export default function ItemDashboard({
       <p className="mb-5 text-sm text-muted">
         {preview
           ? 'Explore fictional items. Select a summary or filter, then choose an item to see its next step.'
-          : 'Select a summary to filter your hotel’s items. Choose an item for guidance, then open its record to take action.'}
+          : 'Open a metric for its details. Use the independent action board below to filter records and take action.'}
       </p>
 
       {error && (
@@ -168,32 +178,16 @@ export default function ItemDashboard({
           )
           const className = `summary-card ${activeView === card.id ? 'summary-card-active' : ''}`
 
-          return preview ? (
-            <button
-              key={card.id}
-              type="button"
-              className={className}
-              aria-pressed={activeView === card.id}
-              aria-controls="dashboard-items"
-              onClick={() => chooseFilter(card.id)}
-            >
-              {content}
-            </button>
-          ) : (
-            <Link
-              key={card.id}
-              href={href(card.id)}
-              className={className}
-              aria-current={activeView === card.id ? 'page' : undefined}
-            >
-              {content}
-            </Link>
-          )
+          return <button key={card.id} type="button" className={className} aria-haspopup="dialog" onClick={() => setMetric(card.id)}>{content}</button>
+
         })}
       </div>
 
+      <Modal open={metric !== null} title={DASHBOARD_SUMMARIES.find((c) => c.id === metric)?.label ?? 'Metric details'} onClose={() => setMetric(null)}>
+        {metric && (preview ? <div><p className="hint">Sample data only.</p><p className="metric-total">{counts[metric] ?? '—'}</p><ul>{items.filter((i) => matchesDashboardFilter(i,metric)).map((i) => <li key={i.id} className="py-2">{i.description} · {i.location}</li>)}</ul></div> : <MetricDetails key={metric} metric={metric}/>)}
+      </Modal>
       <div
-        className={`mt-6 grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_19rem] ${pending ? 'opacity-70' : ''}`}
+        className={`mt-6 grid items-start gap-5 dashboard-board-stack ${pending ? 'opacity-70' : ''}`}
         aria-busy={pending}
       >
         <div className="panel min-w-0 overflow-hidden">
@@ -223,7 +217,7 @@ export default function ItemDashboard({
                 action={to('/items')}
                 method="get"
                 role="search"
-                className="flex w-full gap-2 sm:w-auto"
+                className="filter-toolbar item-search-form"
               >
                 <input type="hidden" name="view" value={activeView} />
                 <label htmlFor="dashboard-search" className="sr-only">
@@ -239,6 +233,10 @@ export default function ItemDashboard({
                   placeholder="Room or item code"
                   maxLength={20}
                 />
+                <label className="sr-only" htmlFor="item-category">Category</label>
+                <select id="item-category" name="category" defaultValue={category} className="field !min-h-10 !text-sm"><option value="">All categories</option>{CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}</select>
+                <label className="sr-only" htmlFor="item-tier">Value tier</label>
+                <select id="item-tier" name="tier" defaultValue={tier} className="field !min-h-10 !text-sm"><option value="">All value tiers</option>{(['standard','valuable','sensitive'] as ValueTier[]).map((v) => <option key={v}>{v}</option>)}</select>
                 <button className="btn btn-secondary !min-h-10 !text-sm">
                   Find
                 </button>

@@ -1,3 +1,4 @@
+import RecordFilters from '@/components/workspace/RecordFilters'
 import Link from 'next/link'
 import { requireSession } from '@/lib/auth'
 import { staffPath } from '@/lib/staff-paths'
@@ -23,9 +24,9 @@ export default async function EmailsPage() {
       {rows.length === 0 ? (
         <p className="panel p-5 text-muted">No customer emails yet. They are created when a customer sends a report with their email address.</p>
       ) : (
-        <ul className="space-y-3">
+        <RecordFilters scope="latest 50 customer emails" records={rows.map((e) => ({id:String(e.id),search:`${e.reference} ${maskEmail(e.recipient)} ${e.subject??''}`,status:e.status,kind:e.template,date:e.sent_at??e.created_at}))} statusLabels={EMAIL_STATUS_LABEL} kindLabels={EMAIL_TEMPLATE_LABEL}>
           {rows.map((e) => (
-            <li key={e.id} className="panel p-4">
+            <div key={e.id} className="panel p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-semibold">{EMAIL_TEMPLATE_LABEL[e.template] ?? e.template}</span>
                 <span className={`badge ${tone(e.status)}`}>{EMAIL_STATUS_LABEL[e.status] ?? e.status}</span>
@@ -41,9 +42,9 @@ export default async function EmailsPage() {
                   <pre className="mt-2 whitespace-pre-wrap rounded-lg bg-paper p-3 font-sans text-sm">{e.body_text}</pre>
                 </details>
               )}
-            </li>
+            </div>
           ))}
-        </ul>
+        </RecordFilters>
       )}
     </div>
   )

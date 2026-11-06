@@ -1,3 +1,4 @@
+import RecordFilters from '@/components/workspace/RecordFilters'
 import { requireSession } from '@/lib/auth'
 import { withStaff } from '@/lib/db'
 import { loadNotifications, SHOW_DAYS } from '@/lib/notifications'
@@ -28,9 +29,9 @@ export default async function NotificationsPage() {
       {items.length === 0 ? (
         <p className="panel p-5 text-muted">Nothing yet. New reports, guest replies and reports assigned to you appear here.</p>
       ) : (
-        <ul className="panel divide-y divide-line overflow-hidden">
+        <RecordFilters scope={`latest 50 notifications in the last ${SHOW_DAYS} days`} records={items.map((n) => ({id:String(n.id),search:n.message,status:n.read?'read':'unread',kind:n.kind,date:n.created_at}))} statusLabels={{read:'Read',unread:'Unread'}} kindLabels={{new_report:'New report',customer_replied:'Guest reply',assigned:'Assignment'}}>
           {items.map((n) => (
-            <li key={n.id}>
+            <div key={n.id} className="panel overflow-hidden">
               <form action={openNotification}>
                 <input type="hidden" name="id" value={n.id} />
                 <button className={`flex w-full items-start gap-3 p-4 text-left hover:bg-teal-soft ${n.read ? '' : 'bg-paper'}`}>
@@ -44,9 +45,9 @@ export default async function NotificationsPage() {
                   </span>
                 </button>
               </form>
-            </li>
+            </div>
           ))}
-        </ul>
+        </RecordFilters>
       )}
     </div>
   )

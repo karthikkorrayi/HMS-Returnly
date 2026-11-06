@@ -8,8 +8,7 @@ import { hotelLoginPath } from '@/lib/hotel-login'
 import { staffPath } from '@/lib/staff-paths'
 import { listHotels } from '@/lib/requests/public-actions'
 import ReturnlyIcon from '@/components/ReturnlyIcon'
-import Brand from '@/components/foundora/Brand'
-import ThemeToggle from '@/components/foundora/Theme'
+import AuthFrame from '@/components/workspace/AuthFrame'
 import HotelFinder from './HotelFinder'
 
 // Staff sign-in is on each hotel's own page, /h/<code>/login. This page only
@@ -30,17 +29,13 @@ export default async function LoginPage({
   if (hotels.length === 1) redirect(hotelLoginPath(hotels[0].slug, { next: params.next ?? null, setup: params.setup ?? null, u: params.u ?? null }))
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4 py-10">
+    <AuthFrame>
       <div className="w-full max-w-sm">
         <Link href="/" className="mb-8 inline-flex items-center gap-2 text-sm font-semibold text-teal">
           <ReturnlyIcon name="arrow" className="rotate-180" />
           Back to overview
         </Link>
         <div className="mb-8">
-          <div className="flex items-center justify-between gap-3">
-            <Brand />
-            <ThemeToggle />
-          </div>
           <h1 className="mt-5 text-2xl font-bold">Staff sign in</h1>
           <p className="hint mt-1">Enter your hotel’s code to go to its sign-in page.</p>
         </div>
@@ -48,6 +43,6 @@ export default async function LoginPage({
           <HotelFinder next={next} />
         </div>
       </div>
-    </main>
+    </AuthFrame>
   )
 }

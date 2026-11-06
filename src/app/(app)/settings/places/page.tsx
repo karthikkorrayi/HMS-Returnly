@@ -1,3 +1,4 @@
+import EditPanel from '@/components/workspace/EditPanel'
 import Link from 'next/link'
 import { requireSession } from '@/lib/auth'
 import { staffPath } from '@/lib/staff-paths'
@@ -20,7 +21,7 @@ export default async function PlacesPage() {
         <p className="hint mt-1">Retired entries are kept for history but no longer offered to staff.</p>
       </div>
 
-      <section className="panel space-y-4 p-4 sm:p-5">
+      <section className="panel space-y-4 p-4 sm:p-5"><EditPanel label="Places configuration">
         <div>
           <h2 className="text-lg font-semibold">Public areas</h2>
           <p className="hint">Suggested when an item is found outside a guest room. Renaming doesn’t change items already logged.</p>
@@ -45,9 +46,9 @@ export default async function PlacesPage() {
             <input id="new-area" name="label" className="field" maxLength={60} placeholder="e.g. Spa" required />
           </div>
         </InlineAction>
-      </section>
+      </EditPanel></section>
 
-      <section className="panel space-y-4 p-4 sm:p-5">
+      <section className="panel space-y-4 p-4 sm:p-5"><EditPanel label="Places configuration">
         <div>
           <h2 className="text-lg font-semibold">Where found items are kept</h2>
           <p className="hint">Valuable and sensitive items can only go to a locked place.</p>
@@ -91,7 +92,7 @@ export default async function PlacesPage() {
             </select>
           </div>
         </InlineAction>
-      </section>
+      </EditPanel></section>
     </div>
   )
 }

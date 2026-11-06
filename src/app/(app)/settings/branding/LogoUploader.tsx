@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { notify } from '@/components/foundora/Toast'
+import { useEditBusy } from '@/components/workspace/EditPanel'
 import { useRouter } from 'next/navigation'
 
 // Shrinks the logo on the phone (600 px, JPEG on a white background, which
@@ -26,20 +27,23 @@ async function shrink(file: File, dark: boolean): Promise<Blob> {
     canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not process the image.'))), 'image/jpeg', 0.9))
 }
 
-export default function LogoUploader({ current, dark = false }: { current: string | null; dark?: boolean }) {
+export default function LogoUploader({ current, dark = false, mark = false }: { current: string | null; dark?: boolean; mark?: boolean }) {
+  const [busy, setBusy] = useState(false)
   const router = useRouter()
+  const setEditBusy = useEditBusy()
+  useEffect(() => { setEditBusy?.(busy); return () => setEditBusy?.(false) }, [busy, setEditBusy])
   const input = useRef<HTMLInputElement>(null)
+  const root = useRef<HTMLDivElement>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const [selected, setSelected] = useState<Blob | null>(null)
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview) }, [preview])
-  const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null)
 
   async function send(method: 'POST' | 'DELETE', body?: Blob) {
     setBusy(true)
     setMessage(null)
     try {
-      const res = await fetch(`/api/brand/logo${dark ? '?theme=dark' : ''}`, {
+      const res = await fetch(`/api/brand/logo${mark ? '?variant=mark' : dark ? '?theme=dark' : ''}`, {
         method,
         headers: body ? { 'content-type': 'image/jpeg' } : undefined,
         body,
@@ -52,6 +56,7 @@ export default function LogoUploader({ current, dark = false }: { current: strin
         setSelected(null)
         setPreview(null)
         notify('success', method === 'POST' ? 'Hotel logo saved.' : 'Hotel logo removed.')
+        root.current?.dispatchEvent(new CustomEvent('foundora-form-result', {bubbles:true,detail:{ok:true}}))
         router.refresh()
       }
     } catch {
@@ -86,7 +91,7 @@ export default function LogoUploader({ current, dark = false }: { current: strin
   }
 
   return (
-    <div className="space-y-3">
+    <div ref={root} className="space-y-3">
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex h-16 w-40 items-center justify-center rounded-lg border border-line bg-white p-2">
           {current
