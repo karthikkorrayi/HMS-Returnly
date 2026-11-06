@@ -2,6 +2,8 @@ import { requireSession } from '@/lib/auth'
 import { withStaff } from '@/lib/db'
 import { ROLE_LABEL, type Staff } from '@/lib/types'
 import { ROLE_ORDER, ROLE_PERMISSIONS } from '@/lib/role-permissions'
+import { ModalTrigger } from '@/components/workspace/Modal'
+import StaffDirectory from '@/components/workspace/StaffDirectory'
 import ActionForm from '@/components/ActionForm'
 import InlineAction from '@/components/InlineAction'
 import { createStaff, editStaff, resetPassword, setActive } from './actions'
@@ -14,7 +16,7 @@ const ROLE_OPTIONS = [
 ]
 
 export default async function StaffPage() {
-  const { staff: me } = await requireSession(['manager'])
+  const { staff: me, property } = await requireSession(['manager'])
   // Read as the manager: row-level security returns only their hotel's staff.
   const staff = (
     await withStaff(me.user_id, (tx) =>
@@ -34,8 +36,7 @@ export default async function StaffPage() {
         </p>
       </div>
 
-      <section aria-labelledby="add" className="panel p-4 sm:p-5">
-        <h2 id="add" className="mb-3 text-lg font-bold">Add a staff member</h2>
+      <ModalTrigger label="Add staff" title="Add a staff member" closeOnSave>
         <ActionForm action={createStaff} submitLabel="Add staff member" pendingLabel="Adding…">
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
@@ -67,18 +68,17 @@ export default async function StaffPage() {
             </div>
             <div>
               <label htmlFor="new-password" className="label">Temporary password</label>
-              <input id="new-password" name="password" type="text" className="field" minLength={10} autoComplete="off" required />
+              <input id="new-password" name="password" type="password" className="field" minLength={10} autoComplete="off" required />
               <p className="hint mt-1">At least 10 characters. Give it to them in person.</p>
             </div>
           </div>
         </ActionForm>
-      </section>
+      </ModalTrigger>
 
-      <section aria-labelledby="team">
-        <h2 id="team" className="mb-3 text-lg font-bold">Team ({staff.filter((s) => s.active).length} active)</h2>
-        <ul className="space-y-2">
-          {staff.map((s) => (
-            <li key={s.user_id} className={`panel p-4 ${s.active ? '' : 'opacity-70'}`}>
+      <StaffDirectory staff={staff} me={me.user_id} profiles={staff.map((s) => (
+            <div key={s.user_id} className="space-y-4">
+              <dl className="profile-details"><div><dt>Hotel</dt><dd>{property.name} ({property.inn_code})</dd></div><div><dt>Account ID</dt><dd className="break-all">{s.user_id}</dd></div><div><dt>Access scope</dt><dd>{s.active ? 'Active — this hotel only' : 'Deactivated — sign-in disabled'}</dd></div></dl>
+              <h3 className="font-bold">Assigned permissions</h3><ul className="permission-list">{ROLE_PERMISSIONS.filter((p) => p.roles.includes(s.role)).map((p) => <li key={p.what}>{p.what}{p.note && <span className="hint block">{p.note}</span>}</li>)}</ul>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <p className="font-semibold">
@@ -117,7 +117,7 @@ export default async function StaffPage() {
                       <ActionForm action={resetPassword} hidden={{ user_id: s.user_id }} submitLabel="Set new password" variant="secondary">
                         <div>
                           <label htmlFor={`pw-${s.user_id}`} className="label">New password</label>
-                          <input id={`pw-${s.user_id}`} name="password" type="text" className="field" minLength={10} autoComplete="off" required />
+                          <input id={`pw-${s.user_id}`} name="password" type="password" className="field" minLength={10} autoComplete="off" required />
                         </div>
                       </ActionForm>
                     )}
@@ -132,14 +132,12 @@ export default async function StaffPage() {
                   </div>
                 </details>
               )}
-            </li>
-          ))}
-        </ul>
-      </section>
+            </div>
+          ))} />
 
       <section aria-labelledby="roles" className="panel p-4 sm:p-5">
         <h2 id="roles" className="text-lg font-bold">What each role can do</h2>
-        <p className="hint mt-1">These rules are built into the system; a manager chooses each person’s role above.</p>
+        <details className="mt-3"><summary className="cursor-pointer font-semibold text-teal">View role permissions</summary><p className="hint mt-1">These rules are built into the system; a manager chooses each person’s role above.</p>
         <ul className="mt-3 divide-y divide-line">
           {ROLE_PERMISSIONS.map((p) => (
             <li key={p.what} className="py-3">
@@ -152,7 +150,7 @@ export default async function StaffPage() {
               </p>
             </li>
           ))}
-        </ul>
+        </ul></details>
       </section>
     </div>
   )

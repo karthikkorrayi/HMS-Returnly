@@ -1,3 +1,4 @@
+import EditPanel from '@/components/workspace/EditPanel'
 import Link from 'next/link'
 import { requireSession } from '@/lib/auth'
 import { staffPath } from '@/lib/staff-paths'
@@ -24,10 +25,14 @@ export default async function BrandingPage() {
 
       <section className="panel p-4 sm:p-5">
         <h2 className="mb-1 text-lg font-semibold">Logo</h2>
-        <h3 className="label">Default / light theme</h3>
+<EditPanel label="Hotel logos"><h3 className="label">Hotel logo with text — default / light theme</h3>
         <LogoUploader current={b.logo_key ? logoPath(b.slug, b.logo_version) : null} />
         <h3 className="label mt-5">Dark theme (optional)</h3>
         <LogoUploader dark current={b.dark_logo_key ? `${logoPath(b.slug, b.logo_version)}&theme=dark` : null} />
+        <h3 className="label mt-5">Standalone hotel logo — without text</h3>
+        <LogoUploader mark current={b.mark_logo_key ? `${logoPath(b.slug, b.logo_version)}&variant=mark` : null} />
+        <p className="hint mt-2">Used alone in the sidebar footer. Until uploaded, the hotel initial is shown; the full wordmark is not cropped.</p>
+        </EditPanel>
       </section>
 
       <section className="panel p-4 sm:p-5">
@@ -36,7 +41,7 @@ export default async function BrandingPage() {
           Your guest page: <a className="break-all font-semibold text-teal underline" href={`/h/${b.slug}`}>{origin}/h/{b.slug}</a>
         </p>
         {/* Submitted by hand, so typed values stay if something is refused. */}
-        <InlineAction action={saveBrandingAction} submitLabel="Save branding" pendingLabel="Saving…" variant="primary" okText="Saved">
+<EditPanel label="Branding details"><InlineAction action={saveBrandingAction} submitLabel="Save branding" pendingLabel="Saving…" variant="primary" okText="Saved">
           <div className="w-full space-y-4">
           <div>
             <label htmlFor="slug" className="label">Web address</label>
@@ -62,7 +67,7 @@ export default async function BrandingPage() {
             <p className="hint mt-1">Shown in the “report received” email. Plain text, up to 300 characters.</p>
           </div>
           </div>
-        </InlineAction>
+        </InlineAction></EditPanel>
       </section>
     </div>
   )

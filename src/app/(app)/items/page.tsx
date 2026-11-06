@@ -3,7 +3,7 @@ import { ITEM_ROLES, requireSession } from '@/lib/auth'
 import { staffPath } from '@/lib/staff-paths'
 import { withStaff } from '@/lib/db'
 import { hotelToday } from '@/lib/format'
-import { CATEGORY_LABEL } from '@/lib/types'
+import { CATEGORY_LABEL, CATEGORIES } from '@/lib/types'
 import ItemDashboard from '@/components/ItemDashboard'
 import { getDashboardView, type DashboardCounts, type DashboardItem } from '@/lib/item-dashboard'
 import { cleanSearch, loadDashboard } from '@/lib/queries/item-dashboard'
@@ -13,7 +13,7 @@ const PAGE_SIZE = 12
 export default async function ItemsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; q?: string; p?: string }>
+  searchParams: Promise<{ view?: string; q?: string; p?: string; category?: string; tier?: string }>
 }) {
   const { staff, property } = await requireSession(ITEM_ROLES)
   const params = await searchParams
@@ -27,6 +27,8 @@ export default async function ItemsPage({
 
   const selectedView = getDashboardView(requestedView)
   const q = cleanSearch(params.q)
+  const category = CATEGORIES.some((c) => c.value === params.category) ? params.category! : ''
+  const tier = ['standard','valuable','sensitive'].includes(params.tier ?? '') ? params.tier! : ''
 
   const requestedPage = Number(params.p)
   const page = Number.isSafeInteger(requestedPage) && requestedPage > 0
@@ -40,7 +42,7 @@ export default async function ItemsPage({
   let result: Awaited<ReturnType<typeof loadDashboard>> | null = null
   try {
     result = await withStaff(staff.user_id, (tx) =>
-      loadDashboard(tx, { propertyId: property.id, view: selectedView.id, search: q, page, pageSize: PAGE_SIZE, today })
+      loadDashboard(tx, { propertyId: property.id, view: selectedView.id, search: q, page, pageSize: PAGE_SIZE, category, tier, today })
     )
   } catch (e) {
     console.error('items dashboard', e)
@@ -52,6 +54,8 @@ export default async function ItemsPage({
   if (lastPage !== null && page > lastPage) {
     const next = new URLSearchParams({ view: selectedView.id })
     if (q) next.set('q', q)
+    if (category) next.set('category', category)
+    if (tier) next.set('tier', tier)
     if (lastPage > 1) next.set('p', String(lastPage))
     redirect(staffPath(property.slug, `/items?${next.toString()}`))
   }
@@ -88,7 +92,6 @@ export default async function ItemsPage({
     <div>
       <div className="mb-7 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="mb-2 text-sm text-muted">{property.name}</p>
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
             Welcome back, {staff.display_name}.
           </h1>
@@ -99,13 +102,15 @@ export default async function ItemsPage({
       </div>
 
       <ItemDashboard
-        key={`${selectedView.id}:${q}:${page}`}
+        key={`${selectedView.id}:${q}:${category}:${tier}:${page}`}
         mode="live"
         items={items}
         counts={counts}
         role={staff.role}
         view={selectedView.id}
         search={q}
+        category={category}
+        tier={tier}
         page={page}
         pageSize={PAGE_SIZE}
         total={total}

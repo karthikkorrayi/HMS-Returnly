@@ -1,3 +1,4 @@
+import EditPanel from '@/components/workspace/EditPanel'
 import Link from 'next/link'
 import { requireSession } from '@/lib/auth'
 import { staffPath } from '@/lib/staff-paths'
@@ -56,7 +57,7 @@ export default async function SettingsPage() {
       <section className="panel p-4 sm:p-5">
         <h2 className="mb-1 text-lg font-semibold">Hotel and guest support</h2>
         <p className="hint mb-4">Guests see the contact details on the lost property page. The hotel code ({hotel.inn_code}) is on every item tag and can’t be changed.</p>
-        <ActionForm action={saveHotelDetailsAction} submitLabel="Save hotel details">
+        <EditPanel label="Hotel details"><ActionForm action={saveHotelDetailsAction} submitLabel="Save hotel details">
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="name" className="label">Hotel name</label>
@@ -73,7 +74,7 @@ export default async function SettingsPage() {
               </div>
             ))}
           </div>
-        </ActionForm>
+        </ActionForm></EditPanel>
       </section>
 
       <section className="panel p-4 sm:p-5">
@@ -121,7 +122,7 @@ export default async function SettingsPage() {
 
       <section className="panel p-4 sm:p-5">
         <h2 className="mb-3 text-lg font-semibold">How long records are kept</h2>
-        <ActionForm action={saveSettings} submitLabel="Save settings">
+        <EditPanel label="Retention settings"><ActionForm action={saveSettings} submitLabel="Save settings">
           {retention.map((f) => (
             <div key={f.name}>
               <label htmlFor={f.name} className="label">{f.label}</label>
@@ -130,7 +131,7 @@ export default async function SettingsPage() {
               <p className="hint mt-1">{f.hint}</p>
             </div>
           ))}
-        </ActionForm>
+        </ActionForm></EditPanel>
         <div className={`mt-4 rounded-xl p-3 text-sm ${cleanup.state === 'ok' ? 'bg-paper' : 'bg-attention-soft text-attention'}`} role={cleanup.state === 'ok' ? undefined : 'alert'}>
           <p className="font-semibold">Daily clean-up{cleanup.state === 'ok' ? '' : ' needs attention'}</p>
           <p className="mt-0.5">{cleanup.text}</p>

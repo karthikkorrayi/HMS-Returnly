@@ -114,6 +114,14 @@ check(p1.rows.length === 2 && p3.rows.length === 1 && p3.total === 5, 'paging: 2
 check(cleanSearch(" 10%' or 1=1 -- ") === '10or11--' && cleanSearch({}) === '' && cleanSearch('x'.repeat(50)).length === 20,
   'search input is reduced to letters, digits and dashes (max 20)')
 
+
+console.log('\nCombined server-side filters')
+const valuables = await load({tier:'valuable', category:'electronics', pageSize:1})
+check(valuables.total === 1 && valuables.rows[0].id === d.id, 'category and value filters apply before counting and pagination')
+check((await load({category:'clothing'})).total === 0, 'category filter excludes other categories')
+check((await load({tier:"valuable' or 1=1 --"})).total === 0, 'filter values stay bound parameters, never SQL')
+check(valuables.counts.open === open.counts.open, 'filtered action board does not alter hotel-wide metric counts')
+
 console.log('\nIsolation and photos')
 const other = await load({}, OT, OTHER)
 check(other.total === 1 && other.rows[0].description === 'Other hotel item', 'the other hotel sees only its own item')

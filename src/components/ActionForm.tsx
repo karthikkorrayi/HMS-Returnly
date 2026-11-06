@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useEffect } from 'react'
+import { useActionState, useEffect, useRef } from 'react'
 import { notify } from '@/components/foundora/Toast'
 import { initialActionState, type ActionState } from '@/lib/types'
 
@@ -26,7 +26,12 @@ export default function ActionForm({
   className = '',
   children,
 }: Props) {
+  const form = useRef<HTMLFormElement>(null)
   const [state, formAction, pending] = useActionState(action, initialActionState)
+  useEffect(() => {
+    form.current?.dispatchEvent(new CustomEvent('foundora-form-result', { bubbles: true, detail: { pending, ok: !pending && Boolean(state.ok) && !state.error } }))
+  }, [pending, state])
+
   useEffect(() => {
     if (state.error) notify('error', state.error)
     else if (state.ok) notify('success', 'Changes saved.')
@@ -35,6 +40,7 @@ export default function ActionForm({
 
   return (
     <form
+      ref={form}
       action={formAction}
       className={`space-y-3 ${className}`}
       onSubmit={(e) => {

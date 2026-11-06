@@ -55,9 +55,11 @@ const NAV: Record<StaffRole, NavItem[]> = {
 export default function Nav({
   role,
   variant,
+  collapsed = false,
 }: {
   role: StaffRole
   variant: 'rail' | 'bar'
+  collapsed?: boolean
 }) {
   // Menu paths are the pages (/items); links and the address bar are the
   // hotel's (/h/<slug>/items).
@@ -77,6 +79,7 @@ export default function Nav({
   return (
     <nav
       aria-label="Main"
+      data-collapsed={collapsed}
       className={variant === 'bar'
         ? 'fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] md:hidden'
         : ''}
@@ -86,6 +89,8 @@ export default function Nav({
           <li key={item.href} className={variant === 'bar' ? 'flex-1' : ''}>
             <Link
               href={to(item.href)}
+              title={item.label}
+              aria-label={item.label}
               aria-current={isActive(item.href) ? 'page' : undefined}
               className={variant === 'rail'
                 ? `flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold ${
@@ -98,7 +103,7 @@ export default function Nav({
                   }`}
             >
               <Icon name={item.icon} />
-              {item.label}
+              <span className="nav-text">{item.label}</span>
             </Link>
           </li>
         ))}

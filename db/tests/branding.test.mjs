@@ -133,6 +133,21 @@ check((await A((tx) => br.publicLogoKey(tx, 'grand-london', true))) === darkBran
 check((await S(MGR, (tx) => br.removeLogo(tx, true))) === darkBrand.dark_logo_key, 'removing returns the dark file key for cleanup')
 check((await A((tx) => br.publicLogoKey(tx, 'grand-london', true))) === b2.logo_key, 'removal restores the default fallback')
 
+
+console.log('\nStandalone mark access and independence')
+check((await A((tx) => br.publicLogoKey(tx, 'grand-london', 'mark'))) === null, 'no mark is fabricated or cropped from the full logo')
+const priorMark = await S(MGR, (tx) => br.replaceLogo(tx, store, DEMO, JPEG, 'mark'))
+const marked = await S(MGR, br.loadBranding)
+check(priorMark === null && files_.has(marked.mark_logo_key), 'standalone logo has a separate stored file')
+check((await A((tx) => br.publicLogoKey(tx, 'grand-london', 'mark'))) === marked.mark_logo_key, 'public mark endpoint resolves that file')
+check((await A((tx) => br.publicLogoKey(tx, 'grand-london'))) === b2.logo_key, 'mark upload leaves the full logo unchanged')
+check(/Only managers/.test(await attempt(HK, (tx) => br.removeLogo(tx, 'mark'))), 'housekeeping cannot remove the standalone mark')
+check(await attempt(MGR, (tx) => tx.rpc('set_hotel_mark_logo', {p_key:otherKey})) === '22023', 'standalone mark cannot reference another hotel folder')
+await S(OTHER, (tx) => br.removeLogo(tx, 'mark'))
+check((await A((tx) => br.publicLogoKey(tx, 'grand-london', 'mark'))) === marked.mark_logo_key, 'another hotel manager cannot remove this mark')
+check((await S(MGR, (tx) => br.removeLogo(tx, 'mark'))) === marked.mark_logo_key, 'removing the mark returns its old key for file cleanup')
+check((await A((tx) => br.publicLogoKey(tx, 'grand-london', 'mark'))) === null, 'removed mark is no longer publicly available')
+
 if (real) await pool.end()
 else await db.exec('reset role')
 await close()

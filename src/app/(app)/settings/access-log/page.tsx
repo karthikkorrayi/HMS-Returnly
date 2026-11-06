@@ -1,3 +1,4 @@
+import RecordFilters from '@/components/workspace/RecordFilters'
 import Link from 'next/link'
 import { requireSession } from '@/lib/auth'
 import { withStaff } from '@/lib/db'
@@ -21,18 +22,18 @@ export default async function AccessLogPage() {
       {rows.length === 0 ? (
         <p className="panel p-5 text-muted">No reports opened yet.</p>
       ) : (
-        <ul className="panel divide-y divide-line">
+        <RecordFilters scope="latest 100 access records" records={rows.map((r) => ({id:String(r.id),search:`${r.staff_name} ${r.reference}`,date:r.created_at}))}>
           {rows.map((r) => (
-            <li key={r.id} className="flex flex-wrap items-baseline justify-between gap-2 p-3">
+            <div key={r.id} className="flex flex-wrap items-baseline justify-between gap-2 p-3">
               <span>
                 <span className="font-semibold">{r.staff_name}</span> opened{' '}
                 {r.request_id ? <Link href={to(`/requests/${r.request_id}`)} className="font-semibold text-teal underline">{r.reference}</Link> : <span className="font-semibold">{r.reference}</span>}
                 {!r.request_id && <span className="hint"> (report since deleted)</span>}
               </span>
               <span className="hint">{formatDateTime(r.created_at)}</span>
-            </li>
+            </div>
           ))}
-        </ul>
+        </RecordFilters>
       )}
     </div>
   )

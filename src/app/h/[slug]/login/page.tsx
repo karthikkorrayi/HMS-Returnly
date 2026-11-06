@@ -8,10 +8,8 @@ import { signInDestination } from '@/lib/sign-in-destination'
 import { hotelSlugFrom } from '@/lib/hotel-resolve'
 import { staffPath } from '@/lib/staff-paths'
 import { listHotels } from '@/lib/requests/public-actions'
-import { logoPath } from '@/lib/branding-paths'
 import ReturnlyIcon from '@/components/ReturnlyIcon'
-import Brand from '@/components/foundora/Brand'
-import ThemeToggle from '@/components/foundora/Theme'
+import AuthFrame from '@/components/workspace/AuthFrame'
 import LoginForm from '@/app/login/LoginForm'
 
 // Staff sign-in for one hotel: /h/<slug>/login. Only that hotel's staff can
@@ -47,27 +45,14 @@ export default async function HotelLoginPage({
   const setupUser = typeof q.u === 'string' && /^[a-z0-9._-]{3,32}$/.test(q.u) ? q.u : null
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4 py-10">
+    <AuthFrame hotel={hotel}>
       <div className="w-full max-w-sm">
         <Link href={`/h/${hotel.slug}`} className="mb-8 inline-flex items-center gap-2 text-sm font-semibold text-teal">
           <ReturnlyIcon name="arrow" className="rotate-180" />
           {hotel.name} guest page
         </Link>
         <div className="mb-8">
-          <div className="flex items-center justify-between gap-3">
-            <Brand />
-            <ThemeToggle />
-          </div>
-          <div className="mt-6 flex items-center gap-3">
-            {hotel.has_logo && (
-              // eslint-disable-next-line @next/next/no-img-element -- the hotel's own small logo, served by this app
-              <img src={logoPath(hotel.slug, hotel.logo_version)} alt="" className="h-10 w-auto max-w-28 rounded bg-white object-contain p-1" />
-            )}
-            <div>
-              <h1 className="text-2xl font-bold">Staff sign in</h1>
-              <p className="font-semibold text-teal">{hotel.name}</p>
-            </div>
-          </div>
+          <h1 className="text-2xl font-bold">Staff sign in</h1>
           <p className="hint mt-2">Sign in with the username your manager gave you.</p>
         </div>
         {q.setup === 'done' && (
@@ -81,6 +66,6 @@ export default async function HotelLoginPage({
         </div>
         <p className="hint mt-4">Forgotten your password? A manager can reset it.</p>
       </div>
-    </main>
+    </AuthFrame>
   )
 }

@@ -25,13 +25,17 @@ type Props = {
 export default function InlineAction({
   action, hidden = {}, submitLabel, pendingLabel, variant = 'secondary', confirmText, okText, resetOnOk, className = '', children,
 }: Props) {
+  const form = useRef<HTMLFormElement>(null)
   const [state, formAction, pending] = useActionState(action, initialActionState)
+  useEffect(() => {
+    form.current?.dispatchEvent(new CustomEvent('foundora-form-result', { bubbles: true, detail: { pending, ok: !pending && Boolean(state.ok) && !state.error } }))
+  }, [pending, state])
+
   useEffect(() => {
     if (state.error) notify('error', state.error)
     else if (state.ok) notify('success', okText || 'Changes saved.')
   }, [state, okText])
 
-  const form = useRef<HTMLFormElement>(null)
   useEffect(() => {
     if (resetOnOk && state.ok) form.current?.reset()
   }, [state, resetOnOk])

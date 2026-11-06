@@ -7,7 +7,7 @@ import { randomBytes } from 'node:crypto'
 import { clientIp, rateKey, TOO_MANY } from '../src/lib/rate-limit.ts'
 
 const h = (o) => new Headers(o)
-const SECRET = randomBytes(24).toString('hex')
+const SECRET = 'unit-test-rate-secret-2026-not-for-runtime' // deterministic test fixture, never a runtime credential
 
 test('IP comes from the trusted header only', () => {
   assert.equal(clientIp(h({ 'x-real-ip': '203.0.113.7' }), 'x-real-ip'), '203.0.113.7')
@@ -26,7 +26,8 @@ test('anything that is not an IP address counts as "unknown"', () => {
 test('the key is a 64-character hash that hides the IP', () => {
   const k = rateKey('submit', '203.0.113.7', SECRET)
   assert.match(k, /^[0-9a-f]{64}$/)
-  assert.ok(!k.includes('203'))
+  // A valid hex HMAC can coincidentally contain '203'; verify the full reference vector.
+  assert.equal(k, '5c9b72ac5c7d7c5e21e33f107392a61baebdb2602e49962737087b5bb87d452d')
   assert.equal(k, rateKey('submit', '203.0.113.7', SECRET), 'same visitor, same key')
   assert.notEqual(k, rateKey('lookup', '203.0.113.7', SECRET), 'each limit has its own key')
   assert.notEqual(k, rateKey('submit', '203.0.113.8', SECRET), 'each visitor has their own key')
