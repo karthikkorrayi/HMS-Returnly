@@ -110,6 +110,13 @@ export default async function SettingsPage() {
             </span>
             <ReturnlyIcon name="arrow" />
           </Link>
+          <Link href={staffPath(property.slug, '/settings/contacts')} className="flex items-center justify-between rounded-xl bg-paper p-4 hover:bg-teal-soft">
+            <span>
+              <span className="block font-semibold">Guest contacts</span>
+              <span className="hint">Every guest email that sent a report, once each — records only</span>
+            </span>
+            <ReturnlyIcon name="arrow" />
+          </Link>
           <Link href={staffPath(property.slug, '/settings/emails')} className="flex items-center justify-between rounded-xl bg-paper p-4 hover:bg-teal-soft">
             <span>
               <span className="block font-semibold">Customer emails</span>

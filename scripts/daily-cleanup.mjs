@@ -5,7 +5,8 @@
 //   MIGRATION_DATABASE_URL=… node scripts/daily-cleanup.mjs
 //
 // It calls run_daily_cleanup() in the database (migration 014), which removes
-// expired stays, old closed enquiries and expired sign-in records, and records
+// expired stays, old closed enquiries (and, from 024, guest contacts with no
+// report left) and expired sign-in records, and records
 // the run in ops.job_runs. Lost items and photos are never touched.
 //
 // Logs in as app_owner (only the owner may run the clean-up). The URL contains
@@ -13,8 +14,9 @@
 // problem (variable missing or wrong).
 import { fileURLToPath } from 'node:url'
 
-// public_rate_hits arrived with migration 015; an older database simply reports 0.
-const KINDS = ['stays', 'closed_enquiries', 'sessions', 'verifications', 'rate_limits', 'sign_in_failures', 'public_rate_hits']
+// public_rate_hits arrived with migration 015, guest_contacts with 024; an older
+// database simply reports 0.
+const KINDS = ['stays', 'closed_enquiries', 'guest_contacts', 'sessions', 'verifications', 'rate_limits', 'sign_in_failures', 'public_rate_hits']
 
 /** Runs one clean-up on an open connection. Returns the summary; throws on failure. */
 export async function runCleanup(db, log = console.log) {
