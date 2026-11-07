@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { getSession } from '@/lib/auth'
 import { withStaff } from '@/lib/db'
-import { markRead, notificationTarget, NOTIFIED_ROLES, unreadCount, loadNotifications } from '@/lib/notifications'
+import { markRead, notificationTarget, notificationPulse, NOTIFIED_ROLES, unreadCount, loadNotifications, type NotificationPulse } from '@/lib/notifications'
 import { staffPath } from '@/lib/staff-paths'
 
 // Each action re-checks the session; the database decides which
@@ -54,4 +54,16 @@ export async function notificationSnapshot() {
   return withStaff(me.user_id, async (tx) => ({
     count: await unreadCount(tx), items: await loadNotifications(tx, 200),
   }))
+}
+
+/**
+ * For the live bell (NotificationLive), every 30 seconds: unread count, newest
+ * id and at most 3 new ones. Null when signed out or not notified; errors are
+ * propagated so the client can tell an outage from "nothing new".
+ */
+export async function notificationPulseNow(since: number | null): Promise<NotificationPulse | null> {
+  const me = await staff()
+  if (!me) return null
+  const s = since === null ? null : Number(since)
+  return withStaff(me.user_id, (tx) => notificationPulse(tx, s))
 }

@@ -2,7 +2,7 @@
 
 import { notify } from '@/components/foundora/Toast'
 import { useGuestExperience } from '@/components/foundora/GuestExperience'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { submitReport } from '@/lib/requests/public-actions'
 import { CONFIRM_EMAIL_TEXT, emailTypoHint, isValidEmail, normaliseEmail } from '@/lib/requests/email'
 import { WHEREABOUTS_LABEL, type FoundWhereabouts } from '@/lib/requests/types'
@@ -31,6 +31,8 @@ export default function FoundReportForm({ hotels, today, initialHotel }: { hotel
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [confirming, setConfirming] = useState(false)
   const [busy, setBusy] = useState(false)
+  // Blocks a second send from a double tap before the button re-renders as busy.
+  const sending = useRef(false)
   const [error, setError] = useState<string | null>(null)
   const [sent, setSent] = useState<{ reference: string; token: string } | null>(null)
   const hotelName = hotels.find((h) => h.inn_code === hotel)?.name
@@ -52,7 +54,8 @@ export default function FoundReportForm({ hotels, today, initialHotel }: { hotel
   }
 
   async function onConfirmed() {
-    if (busy) return
+    if (busy || sending.current) return
+    sending.current = true
     setBusy(true)
     setError(null)
     try {
@@ -77,7 +80,7 @@ export default function FoundReportForm({ hotels, today, initialHotel }: { hotel
     if (res.ok) { setSent({ reference: res.reference, token: res.token }); notify('success', 'Found-item report sent to the hotel.') }
     else { setError(res.error); notify('error', res.error) }
     } catch { setError('Could not send your report. Check your connection and try again.'); notify('error', 'The report could not be sent.') }
-    finally { setBusy(false); setConfirming(false) }
+    finally { sending.current = false; setBusy(false); setConfirming(false) }
   }
 
   if (sent) {

@@ -41,6 +41,34 @@ export async function unreadCount(tx: Tx): Promise<number> {
   return rows[0]?.n ?? 0
 }
 
+/**
+ * What the live bell needs every poll, and nothing more: my unread count, the
+ * newest notification id I can see, and up to 3 that are newer than `since`
+ * (for the pop-ups). `since` null = first poll: no pop-ups, just the baseline.
+ * A few hundred bytes instead of the full list (loadNotifications).
+ */
+export type NotificationPulse = { count: number; latest: number; fresh: StaffNotification[] }
+export async function notificationPulse(tx: Tx, since: number | null): Promise<NotificationPulse> {
+  if (since !== null && !(Number.isSafeInteger(since) && since >= 0)) throw new Error('Unknown notification.')
+  const count = await unreadCount(tx)
+  const { rows } = await tx.query<{ latest: number }>(
+    `select coalesce(max(n.id), 0)::float8 as latest from public.staff_notifications n
+      where n.created_at > now() - make_interval(days => $1)`,
+    [SHOW_DAYS]
+  )
+  const latest = rows[0]?.latest ?? 0
+  if (since === null || latest <= since) return { count, latest, fresh: [] }
+  const fresh = await tx.query<StaffNotification>(
+    `select n.id::float8 as id, n.request_id, n.kind, n.message, n.created_at, false as read
+       from public.staff_notifications n
+      where n.id > $1 and n.created_at > now() - make_interval(days => $2)
+        and not exists (select 1 from public.staff_notification_reads r where r.notification_id = n.id and r.user_id = auth.uid())
+      order by n.id desc limit 3`,
+    [since, SHOW_DAYS]
+  )
+  return { count, latest, fresh: fresh.rows }
+}
+
 /** Marks one notification (or all of mine when id is null) as read. Returns how many changed. */
 export async function markRead(tx: Tx, id: number | null): Promise<number> {
   if (id !== null && !(Number.isSafeInteger(id) && id > 0)) throw new Error('Unknown notification.')
