@@ -13,7 +13,7 @@ Secrets are never written here or anywhere in the repository. Only variable
 | Environment | Branch | Deploys when | Data |
 |---|---|---|---|
 | `staging` | `railway` | automatically after a merge, **only once CI is green** (Wait for CI) | synthetic only |
-| `production` | `production` (created in Phase 8) | automatically after a release PR `railway → production` is merged by the owner, once CI is green | real, only after the Phase 14 sign-off |
+| `production` | `production` (created at launch from `railway`; protected like `railway`) | automatically after a release PR `railway → production` is merged by the owner, once CI is green (CI runs on every push to `production`, so "Wait for CI" can finish) | real, only after backups are on and restored once (Phase 1 gate) |
 
 The database is updated before each deploy by the migration runner (pre-deploy
 command). It refuses destructive changes unless run with
