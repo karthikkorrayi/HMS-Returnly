@@ -151,6 +151,7 @@ Run on a phone, on the environment's address. Made-up data only on staging.
 - [ ] a staff member of another hotel can't sign in on your hotel's page ("Username or password is incorrect")
 - [ ] sign out → your hotel's sign-in page
 - [ ] open a customer report → Settings → Access log shows your name, the reference and the time
+- [ ] Settings → Guest contacts lists each test email once (two reports from one address = one row, "2 reports"); support and housekeeping have no Settings; Access log shows "opened the guest contacts list"
 
 **Daily clean-up**
 - [ ] daily-cleanup run by hand → log ends `✓ done`; Settings shows "Last ran less than an hour ago"
