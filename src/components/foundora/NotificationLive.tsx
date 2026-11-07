@@ -1,29 +1,40 @@
 'use client'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import { notificationSnapshot } from '@/app/(app)/notifications/actions'
+import { notificationPulseNow } from '@/app/(app)/notifications/actions'
 import { notify } from './Toast'
+
+// The live bell for managers and support. Every 30 seconds while the tab is
+// visible (and at once when the tab comes back, the window gets focus, or this
+// person changes something), it asks only for the unread count, the newest id
+// and up to 3 new notifications — a few hundred bytes, not the full list.
+// New ones pop up as toasts; the notifications page reloads its list when
+// something changed. Changes elsewhere in the app (dashboard, Action Board,
+// lists) show on the next page load or refresh, as before.
+export const POLL_MS = 30_000
+
 export default function NotificationLive() {
   const router = useRouter()
   const pathname = usePathname()
+  const path = useRef(pathname)
+  useEffect(() => { path.current = pathname }, [pathname])
+
   useEffect(() => {
-    let stopped = false, running = false, newest: number | null = null, signature = '', failed = false
+    let stopped = false, running = false, failed = false
+    let newest: number | null = null, lastCount: number | null = null
     async function refresh() {
-      if (running || document.visibilityState !== 'visible') return
+      if (stopped || running || document.visibilityState !== 'visible') return
       running = true
       try {
-        const snapshot = await notificationSnapshot()
+        const pulse = await notificationPulseNow(newest)
         if (stopped) return
-        if (!snapshot) { stopped = true; return }
-        window.dispatchEvent(new CustomEvent('foundora-unread', { detail: snapshot.count }))
-        if (newest !== null) {
-          const incoming = snapshot.items.filter((n) => n.id > newest!)
-          incoming.slice(0, 3).reverse().forEach((n) => notify('info', n.message))
-        }
-        newest = Math.max(newest ?? 0, ...snapshot.items.map((n) => n.id))
-        const next = JSON.stringify(snapshot.items.map((n) => [n.id, n.read]))
-        if (signature && next !== signature && pathname.endsWith('/notifications')) router.refresh()
-        signature = next
+        if (!pulse) { stopped = true; return }
+        window.dispatchEvent(new CustomEvent('foundora-unread', { detail: pulse.count }))
+        if (newest !== null) pulse.fresh.slice().reverse().forEach((n) => notify('info', n.message))
+        const changed = newest !== null && (pulse.latest !== newest || pulse.count !== lastCount)
+        newest = Math.max(newest ?? 0, pulse.latest)
+        lastCount = pulse.count
+        if (changed && path.current.endsWith('/notifications')) router.refresh()
         if (failed) notify('info', 'Notification updates have resumed.')
         failed = false
       } catch {
@@ -31,13 +42,13 @@ export default function NotificationLive() {
         failed = true
       } finally { running = false }
     }
-    const update = () => { if (!stopped) void refresh() }
+    const update = () => { void refresh() }
     update()
-    const timer = setInterval(update, 5000)
+    const timer = setInterval(update, POLL_MS)
     document.addEventListener('visibilitychange', update)
     window.addEventListener('focus', update)
     window.addEventListener('foundora-data-changed', update)
     return () => { stopped = true; clearInterval(timer); document.removeEventListener('visibilitychange', update); window.removeEventListener('focus', update); window.removeEventListener('foundora-data-changed', update) }
-  }, [pathname, router])
+  }, [router])
   return null
 }

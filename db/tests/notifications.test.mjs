@@ -3,13 +3,14 @@
 // src/lib/notifications.ts), run as the app runs them: staff through the data
 // layer with row-level security. Checks who is told about what, per-person
 // read/unread, that hotels never see each other's notifications, that nothing
+// (PR G: the small pulse the live bell polls sees the same as the list.)
 // personal is in the text, and that notifications go with their report.
 // Both test databases.
 import { openTestDb } from './test-db.mjs'
 import { createDb } from '../../src/lib/db/core.ts'
 import { returnlyTypes } from '../../src/lib/db/pg-types.ts'
 import { submitReport, reportReply } from '../../src/lib/requests/public-queries.ts'
-import { loadNotifications, unreadCount, markRead, notificationTarget } from '../../src/lib/notifications.ts'
+import { loadNotifications, unreadCount, markRead, notificationTarget, notificationPulse } from '../../src/lib/notifications.ts'
 import { readFileSync, readdirSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 
@@ -95,6 +96,24 @@ check(!(await S(SUP, (tx) => loadNotifications(tx))).some((n) => n.kind === 'new
 const fid = await idOf(F.reference)
 await S(M1, (tx) => tx.rpc('assign_request', { p_request_id: fid, p_staff_id: M1 }))
 check(!(await S(M1, (tx) => loadNotifications(tx))).some((n) => n.kind === 'assigned'), 'assigning a report to yourself doesn’t notify you')
+
+console.log('\nThe live bell pulse (PR G)')
+const base = await S(M2, (tx) => notificationPulse(tx, null))
+const m2all = await S(M2, (tx) => loadNotifications(tx))
+check(base.fresh.length === 0 && base.latest === Math.max(...m2all.map((n) => n.id)) && base.count === m2all.filter((n) => !n.read).length,
+  'first poll: just the count and the newest id, no pop-ups', JSON.stringify(base))
+check((await S(M2, (tx) => notificationPulse(tx, base.latest))).fresh.length === 0, 'nothing new: nothing to pop up')
+const P = await A((tx) => submitReport(tx, report({ itemName: 'Red hat', email: 'p@example.com', bookingRef: 'BK-9' })))
+const next = await S(M2, (tx) => notificationPulse(tx, base.latest))
+check(next.latest > base.latest && next.fresh.length === 1 && next.fresh[0].message.includes(P.reference) && next.count === base.count + 1,
+  'a new report: one pop-up, a higher newest id, one more unread', JSON.stringify(next))
+const other = await S(OTHER, (tx) => notificationPulse(tx, 0))
+check(other.latest === 0 && other.fresh.length === 0 && other.count === 0, 'another hotel’s manager sees nothing in the pulse', JSON.stringify(other))
+check((await S(HK, (tx) => notificationPulse(tx, 0))).fresh.length === 0, 'housekeeping: nothing')
+await S(M2, (tx) => markRead(tx, null))
+check((await S(M2, (tx) => notificationPulse(tx, 0))).fresh.length === 0, 'read ones never pop up')
+check(/Unknown notification/.test(await errOf(() => S(M2, (tx) => notificationPulse(tx, -1)))), 'a bad id is refused')
+check((await S(M1, (tx) => notificationPulse(tx, 0))).fresh.length <= 3, 'at most 3 pop-ups at once')
 
 console.log('\nWho can do what')
 check((await S(GONE, unreadCount).catch(() => 0)) === 0, 'a deactivated manager sees nothing')

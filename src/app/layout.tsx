@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next'
-import { headers } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import '@fontsource-variable/public-sans'
 import './globals.css'
 import './foundora.css'
@@ -9,6 +9,7 @@ import GuestExperience from '@/components/foundora/GuestExperience'
 import { themeInit } from '@/components/foundora/Theme'
 import { loadGuestPresentation } from '@/lib/guest-presentation'
 import { hotelToday } from '@/lib/format'
+import { ENTRY_COOKIE, showsEntry } from '@/lib/app-entry'
 
 export const metadata: Metadata = {
   title: 'Foundora — Lost & Found, Made Simple.',
@@ -25,16 +26,19 @@ export default async function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   // Reuse the per-request CSP nonce created by Railway's existing proxy.
   // No inline-script exemption or security-header change is needed.
-  const policy = (await headers()).get('content-security-policy') ?? ''
+  const head = await headers()
+  const policy = head.get('content-security-policy') ?? ''
   const nonce = policy.match(/'nonce-([^']+)'/)?.[1]
   const { hotels, contacts } = await loadGuestPresentation()
+  // The intro only on staff workspace pages, once per browser session (src/lib/app-entry.ts).
+  const entry = showsEntry(head.get('x-foundora-path'), (await cookies()).has(ENTRY_COOKIE))
   return (
     <html data-theme="dark" lang="en-GB" className="h-full antialiased" suppressHydrationWarning>
       <head>
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeInit }} />
       </head>
       <body className="min-h-full">
-        <AppEntry><Toasts />
+        <AppEntry show={entry}><Toasts />
         <GuestExperience
           hotels={hotels}
           contacts={contacts}

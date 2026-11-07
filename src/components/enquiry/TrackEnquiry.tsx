@@ -1,7 +1,7 @@
 'use client'
 
 import { notify } from '@/components/foundora/Toast'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { lookupByLink, lookupEnquiry, replyByLink, replyToEnquiry } from '@/lib/requests/public-actions'
 import { customerStatus, type CustomerStatusView } from '@/lib/requests/types'
 
@@ -25,6 +25,8 @@ export default function TrackEnquiry({ initialRef }: { initialRef: string }) {
   const [busy, setBusy] = useState(false)
   const [reply, setReply] = useState('')
   const [replyError, setReplyError] = useState<string | null>(null)
+  // Blocks a second send from a double tap before the button re-renders.
+  const replying = useRef(false)
   const [sending, setSending] = useState(false)
   const [token, setToken] = useState('')
 
@@ -60,7 +62,8 @@ export default function TrackEnquiry({ initialRef }: { initialRef: string }) {
 
   async function onReply(e: React.FormEvent) {
     e.preventDefault()
-    if (!view || sending) return
+    if (!view || sending || replying.current) return
+    replying.current = true
     setSending(true)
     setReplyError(null)
     try {
@@ -72,7 +75,7 @@ export default function TrackEnquiry({ initialRef }: { initialRef: string }) {
       notify('success', 'Your reply has been sent to the hotel.')
     } else { setReplyError(res.error); notify('error', res.error) }
     } catch { setReplyError('Could not send your reply. Please try again.'); notify('error', 'The reply could not be sent.') }
-    finally { setSending(false) }
+    finally { replying.current = false; setSending(false) }
   }
 
   const status = view ? customerStatus(view.status, view.report_type ?? 'lost') : null
