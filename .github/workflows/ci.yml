@@ -2,8 +2,10 @@ name: CI
 
 on:
   push:
-    # railway is the long-lived integration branch for the migration.
-    branches: [main, railway]
+    # railway is the long-lived integration branch (staging deploys from it);
+    # production deploys from production after a release PR railway → production.
+    # Railway's "Wait for CI" needs this run on every push to both.
+    branches: [main, railway, production]
   pull_request:
 
 jobs:
