@@ -49,10 +49,26 @@ export async function runDispatch(db, cfg, { send = sendViaBrevo, log = console.
   }
   const ready = (await db.query(`select to_regclass('public.email_outbox') is not null as ok`)).rows[0]
   if (!ready.ok) throw new Error('email_outbox does not exist yet: deploy the app first (its pre-deploy step applies migration 017)')
-  return dispatch(db, {
+  // Which database this run reads: it must be the one the website writes to
+  // (the same Postgres service as web's DATABASE_URL). Names only, no secrets.
+  const here = (await db.query(
+    `select current_database() as db, coalesce(host(inet_server_addr()), 'local') as addr,
+            (select coalesce(string_agg(inn_code, ', ' order by inn_code), 'none') from public.properties) as hotels,
+            (select count(*)::int from public.email_outbox where status in ('queued', 'retry')) as waiting`)).rows[0]
+  log(`database: ${here.db} at ${here.addr} · hotels: ${here.hotels} · ${here.waiting} email${here.waiting === 1 ? '' : 's'} waiting`)
+  const summary = await dispatch(db, {
     mode: cfg.mode, baseUrl: cfg.baseUrl, from: cfg.from, allow: cfg.allow, log,
     send: (m) => send({ ...m, apiKey: cfg.apiKey }),
   })
+  // Heartbeat (migration 025): Settings → Customer emails shows when the
+  // sender last ran against this database. Kept 2 days.
+  await db.query(
+    `insert into ops.job_runs (job, finished_at, ok, summary)
+     values ('email_dispatch', now(), $1, $2::jsonb)`,
+    [!summary.stopped, JSON.stringify({ mode: cfg.mode, sent: summary.sent, previewed: summary.previewed, skipped: summary.skipped,
+      retry: summary.retry, failed: summary.failed, expired: summary.expired, stopped: summary.stopped })])
+  await db.query(`delete from ops.job_runs where job = 'email_dispatch' and started_at < now() - interval '2 days'`)
+  return summary
 }
 
 async function main() {

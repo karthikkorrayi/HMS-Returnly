@@ -33,7 +33,7 @@ export default async function RequestList({
   showAssigneeFilter,
 }: {
   basePath: '/requests' | '/support'
-  /** The hotel's address: links are /h/<slug>/… */
+  /** The hotel's address: links are /<slug>/… */
   slug: string
   params: ListParams
   names: Record<string, string>

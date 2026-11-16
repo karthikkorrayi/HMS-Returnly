@@ -29,7 +29,7 @@ export type Property = {
   id: string
   inn_code: string
   name: string
-  /** The hotel's address on Foundora: /h/<slug> (migration 019). */
+  /** The hotel's address on Foundora: /<slug> (migrations 019, 025). */
   slug: string
   retention_days: number
   trace_window_days: number

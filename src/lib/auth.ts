@@ -53,7 +53,7 @@ export async function endCurrentSession(): Promise<void> {
 export const ITEM_ROLES: StaffRole[] = ['housekeeping', 'front_office', 'manager']
 
 // Where each role lands after sign-in or when a page isn't theirs. With the
-// hotel's address it is the full staff address (/h/<slug>/items).
+// hotel's address it is the full staff address (/<slug>/items).
 export function homeFor(role: StaffRole, slug?: string) {
   const path = role === 'support' ? '/support' : '/items'
   return slug ? staffPath(slug, path) : path
@@ -62,7 +62,7 @@ export function homeFor(role: StaffRole, slug?: string) {
 // For pages: redirect to /login when there is no active staff session, and to
 // the role's own home when the page isn't for their role. This is a real
 // server-side check; the database enforces the same rules again.
-// Staff pages are addressed /h/<slug>/<module> (src/proxy.ts): if the address
+// Staff pages are addressed /<slug>/<module> (src/proxy.ts): if the address
 // names another hotel, or none (an old /items bookmark), the person is sent
 // to the same page at their own hotel. The address never grants access.
 export async function requireSession(roles?: StaffRole[]): Promise<Session> {

@@ -11,7 +11,7 @@ import ReturnlyIcon from '@/components/ReturnlyIcon'
 import AuthFrame from '@/components/workspace/AuthFrame'
 import HotelFinder from './HotelFinder'
 
-// Staff sign-in is on each hotel's own page, /h/<code>/login. This page only
+// Staff sign-in is on each hotel's own page, /<code>/login. This page only
 // finds it: with one hotel it goes straight there; otherwise it asks for the
 // hotel code. Old bookmarks of /login (and /signin) keep working.
 export default async function LoginPage({

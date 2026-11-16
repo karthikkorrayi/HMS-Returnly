@@ -13,7 +13,7 @@ import type { ActionState } from '@/lib/types'
 // our cross-site check apply. Here we only check the new session belongs to
 // an ACTIVE staff member; if not, the session is ended straight away.
 //
-// Staff sign in on their hotel's own page (/h/<slug>/login). An account of
+// Staff sign in on their hotel's own page (/<slug>/login). An account of
 // another hotel is refused with the same message as a wrong password, so the
 // page can't be used to find out which hotel an account belongs to, and the
 // session that was just opened is ended at once.
