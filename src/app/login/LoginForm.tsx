@@ -10,7 +10,7 @@ import ReturnlyIcon from '@/components/ReturnlyIcon'
 //   1. the browser sends the username and password to Better Auth, which
 //      checks them, applies the sign-in rate limit and sets the session cookie;
 //   2. the server action finishSignIn checks the login belongs to an active
-//      staff member OF THIS HOTEL (the page's /h/<slug>), then opens their page.
+//      staff member OF THIS HOTEL (the page's /<slug>), then opens their page.
 async function signIn(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const username = String(formData.get('username') ?? '').trim().toLowerCase()
   const password = String(formData.get('password') ?? '')

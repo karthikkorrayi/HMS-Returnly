@@ -230,15 +230,16 @@ All on one domain (later `hotel.foundora.co.uk`; for now the Railway address):
 | Address | What |
 |---|---|
 | `/` | Foundora's home page (guest page for now; Foundora's own page later) |
-| `/h/<code>` | a hotel's guest page |
-| `/h/<code>/login` | that hotel's staff sign-in: only its own staff can sign in there |
-| `/h/<code>/<module>` | its staff pages (`items`, `requests`, `staff`, `settings`, `support`, `account`, `notifications`) |
-| `/login` | "Enter your hotel code" → `/h/<code>/login` (straight there when there is one hotel) |
+| `/` | a short Foundora guidance page only (no hotel list); a new installation opens `/setup` from here |
+| `/<code>` | a hotel's guest page (old `/h/<code>` addresses redirect here permanently) |
+| `/<code>/login` | that hotel's staff sign-in: only its own staff can sign in there |
+| `/<code>/<module>` | its staff pages (`items`, `requests`, `staff`, `settings`, `support`, `account`, `notifications`) |
+| `/login` | "Enter your hotel code" → `/<code>/login` (straight there when there is one hotel) |
 | `/brand/<code>/logo` | the hotel's logo (public) |
 
 - The address only chooses the page and branding. Access is decided by the
   session (which hotel the signed-in person belongs to) and by the database's
-  row-level security. `src/proxy.ts` maps `/h/<code>/<module>` onto the page
+  row-level security. `src/proxy.ts` maps `/<code>/<module>` onto the page
   and tells it which hotel the address named; `requireSession()` sends anyone
   whose hotel differs to the same page at their own hotel. Old `/items`-style
   bookmarks are moved to the hotel's address the same way.
@@ -293,3 +294,15 @@ removed again) and can simply be repeated.
 4. Public page: submit a synthetic enquiry, then follow it on `/track`.
 5. Settings → "Daily clean-up: Last ran … hours ago" (no warning).
 6. The web service's log has no `rate limit: no visitor IP` line.
+
+## Email sender and database must match (PR L)
+
+`email-dispatch` and `daily-cleanup` read the database through their own
+`MIGRATION_DATABASE_URL`. It must name the **same Postgres service** as the
+`web` service's `DATABASE_URL`. If `web` is switched to another database and
+the jobs are not, reports wait in one database while the jobs look at the
+other ("emails: sent 0"); emails older than a day then expire.
+
+- Each `email-dispatch` run logs `database: <name> at <address> · hotels: <codes> · N emails waiting`.
+- Settings and Settings → Customer emails warn when the sender has never run
+  against the hotel's database, has not run for 15 minutes, or is not in `live` mode.

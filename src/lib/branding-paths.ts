@@ -3,9 +3,14 @@
 // Server-side branding (database, storage) is in branding.ts.
 
 const SLUG = /^[a-z0-9]([a-z0-9-]{1,38}[a-z0-9])$/
-// Same list as public._valid_slug() (migration 019).
+// Same list as public._valid_slug() (migrations 019 and 025). A hotel's address
+// is the first part of the path (hotel.foundora.co.uk/<slug>/…), so every
+// top-level page, staff module and public folder of the app is reserved here.
 export const RESERVED_SLUGS = ['www', 'app', 'api', 'admin', 'notify', 'mail', 'news', 'staging', 'status', 'h',
-  'found', 'track', 'login', 'signin', 'setup', 'brand', 'help', 'support', 'foundora']
+  'found', 'track', 'login', 'signin', 'setup', 'brand', 'help', 'support', 'foundora',
+  // migration 025: the rest of the app's top-level addresses, and a few for the guidance pages
+  'items', 'requests', 'staff', 'settings', 'account', 'notifications', 'branding',
+  'about', 'contact', 'privacy', 'terms', 'logout', 'signout']
 
 export function isValidSlug(s: string): boolean {
   return SLUG.test(s) && !s.includes('--') && !RESERVED_SLUGS.includes(s)

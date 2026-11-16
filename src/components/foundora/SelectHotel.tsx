@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react'
 import { useGuestExperience } from './GuestExperience'
 
-// On a hotel's own address (/h/<slug>), choose that hotel so the guest never
+// On a hotel's own address (/<slug>), choose that hotel so the guest never
 // has to pick it again.
 export default function SelectHotel({ code }: { code: string }) {
   const { selectHotel } = useGuestExperience()

@@ -6,13 +6,13 @@ import { withAnon } from '@/lib/db'
 import { isSetUp } from '@/lib/setup'
 import { signInDestination } from '@/lib/sign-in-destination'
 import { hotelSlugFrom } from '@/lib/hotel-resolve'
-import { staffPath } from '@/lib/staff-paths'
+import { staffPath, hotelPagePath } from '@/lib/staff-paths'
 import { listHotels } from '@/lib/requests/public-actions'
 import ReturnlyIcon from '@/components/ReturnlyIcon'
 import AuthFrame from '@/components/workspace/AuthFrame'
 import LoginForm from '@/app/login/LoginForm'
 
-// Staff sign-in for one hotel: /h/<slug>/login. Only that hotel's staff can
+// Staff sign-in for one hotel: /<slug>/login (src/proxy.ts shows this page there). Only that hotel's staff can
 // sign in here (checked after the password, in finishSignIn); everyone else
 // gets "Username or password is incorrect".
 async function hotelFor(param: string) {
@@ -47,7 +47,7 @@ export default async function HotelLoginPage({
   return (
     <AuthFrame hotel={hotel}>
       <div className="w-full max-w-sm">
-        <Link href={`/h/${hotel.slug}`} className="mb-8 inline-flex items-center gap-2 text-sm font-semibold text-teal">
+        <Link href={hotelPagePath(hotel.slug)} className="mb-8 inline-flex items-center gap-2 text-sm font-semibold text-teal">
           <ReturnlyIcon name="arrow" className="rotate-180" />
           {hotel.name} guest page
         </Link>

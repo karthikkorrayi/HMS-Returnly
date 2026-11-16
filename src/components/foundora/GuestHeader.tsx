@@ -4,6 +4,7 @@ import Brand from './Brand'
 import ThemeToggle from './Theme'
 import HotelLogo from './HotelLogo'
 import { useGuestExperience } from './GuestExperience'
+import { hotelPagePath } from '@/lib/staff-paths'
 export default function GuestHeader({ allowHotelSelection = false }: { allowHotelSelection?: boolean }) {
   const { hotels, hotel, selectHotel } = useGuestExperience()
   return (
@@ -33,7 +34,7 @@ export default function GuestHeader({ allowHotelSelection = false }: { allowHote
               </select>
             </div>
           ) : null}
-          <Link href="/" aria-label="FoundOra home"><Brand /></Link>
+          <Link href={hotel?.slug ? hotelPagePath(hotel.slug) : '/'} aria-label={hotel?.slug ? `${hotel.name} lost & found` : 'FoundOra home'}><Brand /></Link>
           <ThemeToggle />
         </div>
       </header>

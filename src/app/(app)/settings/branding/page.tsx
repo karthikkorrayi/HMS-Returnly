@@ -1,3 +1,4 @@
+import { hotelPagePath } from '@/lib/staff-paths'
 import EditPanel from '@/components/workspace/EditPanel'
 import Link from 'next/link'
 import { requireSession } from '@/lib/auth'
@@ -38,7 +39,7 @@ export default async function BrandingPage() {
       <section className="panel p-4 sm:p-5">
         <h2 className="mb-1 text-lg font-semibold">Address, colour and welcome line</h2>
         <p className="hint mb-4">
-          Your guest page: <a className="break-all font-semibold text-teal underline" href={`/h/${b.slug}`}>{origin}/h/{b.slug}</a>
+          Your guest page: <a className="break-all font-semibold text-teal underline" href={hotelPagePath(b.slug)}>{origin}{hotelPagePath(b.slug)}</a>
         </p>
         {/* Submitted by hand, so typed values stay if something is refused. */}
 <EditPanel label="Branding details"><InlineAction action={saveBrandingAction} submitLabel="Save branding" pendingLabel="Saving…" variant="primary" okText="Saved">
@@ -46,7 +47,7 @@ export default async function BrandingPage() {
           <div>
             <label htmlFor="slug" className="label">Web address</label>
             <div className="flex items-center gap-1">
-              <span className="text-muted">/h/</span>
+              <span className="text-muted">/</span>
               <input id="slug" name="slug" className="field" defaultValue={b.slug} maxLength={40} required
                 pattern="[a-z0-9]([a-z0-9\-]{1,38}[a-z0-9])" autoCapitalize="none" spellCheck={false} />
             </div>

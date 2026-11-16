@@ -8,7 +8,8 @@ import { hotelSlugFrom } from '@/lib/hotel-resolve'
 import GuestHome from '@/components/foundora/GuestHome'
 import SelectHotel from '@/components/foundora/SelectHotel'
 
-// A hotel's own address: foundora.co.uk/h/<slug>. Same guest page as the home
+// A hotel's own address: hotel.foundora.co.uk/<slug> (src/proxy.ts shows this
+// page there; the old /h/<slug> redirects to it). Same guest page as the home
 // page, with the hotel already chosen. (Later <slug>.foundora.co.uk can show
 // this page too; hotelSlugFrom() already understands both.)
 async function hotelFor(slugParam: string) {

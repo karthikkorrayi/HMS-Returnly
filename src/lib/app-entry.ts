@@ -1,10 +1,10 @@
 // When the "Preparing your workspace" intro (src/components/workspace/AppEntry.tsx)
 // is shown. Pure (no Next.js), so tests can use it.
 //
-//   * Only on staff workspace pages (/h/<slug>/items, …). src/proxy.ts tells
+//   * Only on staff workspace pages (/<slug>/items, …). src/proxy.ts tells
 //     the page its staff path in the x-foundora-path header (set only there;
-//     copies sent by the browser are removed). Guest pages — /h/<slug>,
-//     /h/<slug>/found, /track, the sign-in pages — never show it, so a guest
+//     copies sent by the browser are removed). Guest pages — /<slug>,
+//     /<slug>/found, /track, the sign-in pages — never show it, so a guest
 //     opening a tracking link from an email sees the page at once.
 //   * At most once per browser session: the intro sets a session cookie
 //     (no personal data: the value is just "1") and later full page loads skip it.
