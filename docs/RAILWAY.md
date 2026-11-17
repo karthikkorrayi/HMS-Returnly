@@ -230,7 +230,7 @@ All on one domain (later `hotel.foundora.co.uk`; for now the Railway address):
 | Address | What |
 |---|---|
 | `/` | Foundora's home page (guest page for now; Foundora's own page later) |
-| `/` | a short Foundora guidance page only (no hotel list); a new installation opens `/setup` from here |
+| `/` | the guest page (choose a hotel, report, track); a new installation opens `/setup` from here, where setup is one card per step |
 | `/<code>` | a hotel's guest page (old `/h/<code>` addresses redirect here permanently) |
 | `/<code>/login` | that hotel's staff sign-in: only its own staff can sign in there |
 | `/<code>/<module>` | its staff pages (`items`, `requests`, `staff`, `settings`, `support`, `account`, `notifications`) |

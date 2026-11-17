@@ -1,8 +1,9 @@
 'use client'
 
-import { startTransition, useActionState, useMemo, useState } from 'react'
+import { startTransition, useActionState, useEffect, useMemo, useRef, useState } from 'react'
 import { initialActionState } from '@/lib/types'
 import { MAX_PASSWORD, MIN_PASSWORD } from '@/lib/better-auth/rules'
+import { SETUP_STEPS, setupErrorStep } from '@/lib/setup-steps'
 import { completeSetup } from './actions'
 
 type Floor = { key: number; name: string; rooms: string }
@@ -19,12 +20,14 @@ function countRooms(text: string): number {
   return n
 }
 
-function Section({ step, title, hint, children }: { step: number; title: string; hint: string; children: React.ReactNode }) {
+// One card per step: only the current one is shown, the others stay in the
+// form (hidden) so everything typed is kept and sent together at the end.
+function Section({ step, current, title, hint, children }: { step: number; current: number; title: string; hint: string; children: React.ReactNode }) {
   return (
-    <section className="panel space-y-4 p-4 sm:p-5">
+    <section className="panel space-y-4 p-4 sm:p-5" hidden={step - 1 !== current} data-step={step - 1} aria-labelledby={`setup-step-${step}`}>
       <div>
-        <p className="text-xs font-semibold uppercase tracking-wide text-teal">Step {step}</p>
-        <h2 className="text-lg font-semibold">{title}</h2>
+        <p className="text-xs font-semibold uppercase tracking-wide text-teal">Step {step} of {SETUP_STEPS.length}</p>
+        <h2 id={`setup-step-${step}`} tabIndex={-1} className="text-lg font-semibold outline-none">{title}</h2>
         <p className="hint mt-1">{hint}</p>
       </div>
       {children}
@@ -44,27 +47,76 @@ export default function SetupForm({ defaultAreas, defaultStorage }: {
   const [showPw, setShowPw] = useState(false)
   const nextKey = () => Date.now() + Math.random()
   const totalRooms = useMemo(() => floors.reduce((n, f) => n + countRooms(f.rooms), 0), [floors])
+  const [step, setStep] = useState(0)
+  const [reached, setReached] = useState(0)
+  const form = useRef<HTMLFormElement>(null)
+  const last = SETUP_STEPS.length - 1
+
+  // The server refused something: open the card the message is about
+  // (adjusting state while rendering, when a new answer arrives).
+  const [answered, setAnswered] = useState(state)
+  if (state !== answered) {
+    setAnswered(state)
+    const at = setupErrorStep(state.error)
+    if (at !== null) setStep(at)
+  }
+  // Move focus to the new card's heading, for keyboards and screen readers.
+  useEffect(() => { form.current?.querySelector<HTMLElement>(`#setup-step-${step + 1}`)?.focus() }, [step])
+
+  /** Checks the fields of one card; shows the browser's message on the first problem. */
+  function cardIsValid(i: number): boolean {
+    const card = form.current?.querySelector(`[data-step="${i}"]`)
+    const fields = card ? Array.from(card.querySelectorAll<HTMLInputElement>('input, select, textarea')) : []
+    const bad = fields.find((f) => !f.checkValidity())
+    if (!bad) return true
+    setStep(i)
+    requestAnimationFrame(() => bad.reportValidity())
+    return false
+  }
+  function goTo(i: number) {
+    if (i > step) { for (let k = step; k < i; k++) if (!cardIsValid(k)) return }
+    setStep(i)
+    setReached((r) => Math.max(r, i))
+  }
 
   return (
     // Submitted by hand rather than <form action>: React clears a form after a
     // form action, and a long setup form must keep what was typed when the
     // server finds a mistake.
     <form
+      ref={form}
       className="space-y-5"
+      noValidate
       onSubmit={(e) => {
         e.preventDefault()
+        if (step < last) { goTo(step + 1); return }
+        for (let k = 0; k <= last; k++) if (!cardIsValid(k)) return
         const data = new FormData(e.currentTarget)
         startTransition(() => formAction(data))
       }}
     >
-      <Section step={1} title="Setup key" hint="The one-time key set as SETUP_TOKEN in the server's settings. It stops anyone else from setting up this installation.">
+      <nav aria-label="Setup steps">
+        <ol className="flex flex-wrap gap-2">
+          {SETUP_STEPS.map((s, i) => (
+            <li key={s.short}>
+              <button type="button" disabled={i > reached}
+                aria-current={i === step ? 'step' : undefined}
+                className={`rounded-full px-3 py-1 text-xs font-semibold ${i === step ? 'bg-teal text-white' : i <= reached ? 'bg-teal-soft text-teal' : 'bg-paper text-muted'}`}
+                onClick={() => goTo(i)}>
+                {i + 1}. {s.short}
+              </button>
+            </li>
+          ))}
+        </ol>
+      </nav>
+      <Section step={1} current={step} title="Setup key" hint="The one-time key set as SETUP_TOKEN in the server's settings. It stops anyone else from setting up this installation.">
         <div>
           <label htmlFor="setup_token" className="label">Setup key</label>
           <input id="setup_token" name="setup_token" type="password" className="field" autoComplete="off" required />
         </div>
       </Section>
 
-      <Section step={2} title="Hotel" hint="Shown to guests on the enquiry page and to staff in the app.">
+      <Section step={2} current={step} title="Hotel" hint="Shown to guests on the enquiry page and to staff in the app.">
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="name" className="label">Hotel name</label>
@@ -82,7 +134,7 @@ export default function SetupForm({ defaultAreas, defaultStorage }: {
         </div>
       </Section>
 
-      <Section step={3} title="Floors and rooms" hint="One row per floor. Separate room numbers with commas; a range like 101-120 adds every room in between.">
+      <Section step={3} current={step} title="Floors and rooms" hint="One row per floor. Separate room numbers with commas; a range like 101-120 adds every room in between.">
         <div className="space-y-3">
           {floors.map((f, i) => (
             <div key={f.key} className="grid gap-3 rounded-xl bg-paper p-3 sm:grid-cols-[8rem_1fr_auto] sm:items-end">
@@ -112,11 +164,11 @@ export default function SetupForm({ defaultAreas, defaultStorage }: {
         </div>
       </Section>
 
-      <Section step={4} title="Public areas" hint="Where items can be found outside guest rooms. One per line or separated by commas. You can change these later.">
+      <Section step={4} current={step} title="Public areas" hint="Where items can be found outside guest rooms. One per line or separated by commas. You can change these later.">
         <textarea name="areas" className="field min-h-32" defaultValue={defaultAreas.join('\n')} />
       </Section>
 
-      <Section step={5} title="Where found items are kept" hint="Shelves, cupboards and safes. Mark the ones that lock: valuable items must go there.">
+      <Section step={5} current={step} title="Where found items are kept" hint="Shelves, cupboards and safes. Mark the ones that lock: valuable items must go there.">
         <div className="space-y-3">
           {stores.map((s, i) => (
             <div key={s.key} className="grid gap-3 rounded-xl bg-paper p-3 sm:grid-cols-[1fr_10rem_auto] sm:items-end">
@@ -145,7 +197,7 @@ export default function SetupForm({ defaultAreas, defaultStorage }: {
         </button>
       </Section>
 
-      <Section step={6} title="Guest support" hint="Shown to guests who need to reach the hotel about lost property. All optional.">
+      <Section step={6} current={step} title="Guest support" hint="Shown to guests who need to reach the hotel about lost property. All optional.">
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="phone" className="label">Phone</label>
@@ -166,7 +218,7 @@ export default function SetupForm({ defaultAreas, defaultStorage }: {
         </div>
       </Section>
 
-      <Section step={7} title="First administrator" hint="This person signs in first and adds the rest of the staff from the Staff page.">
+      <Section step={7} current={step} title="First administrator" hint="This person signs in first and adds the rest of the staff from the Staff page.">
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="admin_name" className="label">Name</label>
@@ -200,8 +252,13 @@ export default function SetupForm({ defaultAreas, defaultStorage }: {
         <p role="alert" className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{state.error}</p>
       )}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <p className="hint">Setup runs once. Everything can be changed later by an administrator, except the hotel code.</p>
-        <button type="submit" className="btn btn-primary" disabled={pending}>{pending ? 'Setting up…' : 'Complete setup'}</button>
+        <p className="hint">{step === last ? 'Setup runs once. Everything can be changed later by an administrator, except the hotel code.' : `Step ${step + 1} of ${SETUP_STEPS.length}. Nothing is saved until the last step.`}</p>
+        <div className="flex gap-2">
+          {step > 0 && <button type="button" className="btn btn-secondary" onClick={() => setStep(step - 1)} disabled={pending}>Back</button>}
+          <button type="submit" className="btn btn-primary" disabled={pending}>
+            {step < last ? 'Next' : pending ? 'Setting up…' : 'Complete setup'}
+          </button>
+        </div>
       </div>
     </form>
   )
