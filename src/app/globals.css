@@ -48,6 +48,9 @@ body {
   outline: 3px solid var(--color-teal);
   outline-offset: 2px;
 }
+/* Headings that receive focus only to announce a new step (setup cards) are
+   not controls: no focus ring on them. */
+h2[tabindex="-1"]:focus-visible { outline: none; }
 
 @layer components {
   .btn {

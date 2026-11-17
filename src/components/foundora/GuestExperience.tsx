@@ -168,8 +168,7 @@ export default function GuestExperience({
       {children}
       {/* Guests only: on staff pages (and staff sign-in) the button covered the
           bottom menu on phones, and staff have no use for the guest guide. */}
-      {/* Not on the Foundora guidance page (/): the assistant belongs to a hotel. */}
-      {!isStaffPage(path) && path !== '/' && (<>
+      {!isStaffPage(path) && (<>
       <button
         ref={launcher}
         type="button"
