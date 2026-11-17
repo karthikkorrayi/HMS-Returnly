@@ -97,3 +97,5 @@ The same checks run in GitHub Actions on every push and pull request.
 - Editing an item's description after logging
 - Removing photos from storage automatically once an item is closed
 - Offline logging for rooms with poor Wi-Fi
+
+Reverted
