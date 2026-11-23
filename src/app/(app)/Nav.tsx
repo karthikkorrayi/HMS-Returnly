@@ -65,7 +65,7 @@ export default function Nav({
   collapsed?: boolean
 }) {
   // Menu paths are the pages (/items); links and the address bar are the
-  // hotel's (/h/<slug>/items).
+  // hotel's (/<slug>/items).
   const pathname = withoutHotel(usePathname())
   const to = useStaffPath()
   const items = NAV[role] ?? []

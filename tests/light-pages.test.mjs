@@ -13,7 +13,7 @@ test('guest pages never show the intro', () => {
   // On guest pages the proxy sets no staff path at all.
   for (const p of [null, undefined, '']) assert.equal(showsEntry(p, false), false)
   // Even if a guest path somehow arrived, it is not a staff module.
-  for (const p of ['/', '/track', '/track?ref=LF-1', '/found', '/login', '/signin', '/setup', '/h/grand', '/h/grand/found', '/h/grand/login'])
+  for (const p of ['/', '/track', '/track?ref=LF-1', '/found', '/login', '/signin', '/setup', '/grand', '/grand/found', '/grand/login', '/h/grand', '/h/grand/found'])
     assert.equal(showsEntry(p, false), false, p)
 })
 

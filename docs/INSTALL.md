@@ -44,7 +44,7 @@ About 30 minutes. Do it for staging first; production only at launch.
    run it once by hand: its log ends `✓ done`.
 5. **Setup key**: `openssl rand -hex 24` on your Mac → variable `SETUP_TOKEN`
    on `web` → deploy.
-6. **First-time setup** on your phone: open `https://<domain>/` → setup screen.
+6. **First-time setup** on your phone: open `https://<domain>/setup` (the root address goes there too until setup is done).
    Enter the key, hotel (code is permanent), floors and rooms (`101-120`
    ranges), areas, storage places, guest support details, first administrator.
 7. **Sign in** as that administrator → add staff on the Staff page.
@@ -139,18 +139,21 @@ Run on a phone, on the environment's address. Made-up data only on staging.
 - [ ] housekeeping and front office see no bell; another hotel's manager sees nothing
 
 **Branding and hotel address**
-- [ ] Settings → Branding: upload a logo (PNG from the phone) → it shows on the page, on `/h/<address>` and in the next customer email
+- [ ] Settings → Branding: upload a logo (PNG from the phone) → it shows on the page, on `/<address>` and in the next customer email
 - [ ] set an email colour; a very light one is refused; a welcome line appears in the next "report received" email
-- [ ] `/h/<address>` opens the guest page with the hotel already chosen; "Hand in a found item" there has the hotel chosen too
-- [ ] change the address → the old `/h/…` shows "not found"; tracking links in earlier emails still work
+- [ ] `/<address>` opens the guest page with the hotel already chosen; "Hand in a found item" there has the hotel chosen too
+- [ ] an old `/h/<address>` link opens `/<address>`; change the address → the old one shows "not found"; tracking links in earlier emails still work
 
 **Hotel sign-in, addresses and access log**
-- [ ] `/login` goes to `/h/<code>/login` (one hotel) or asks for the hotel code; a wrong code is refused and stays in the box
-- [ ] sign in on `/h/<code>/login` → `/h/<code>/items`; every menu link starts with `/h/<code>/`; no guest "Support" button on staff pages
-- [ ] an old bookmark (`/settings`) and another hotel's address (`/h/other/requests`) both land on your own hotel's page
+- [ ] `/login` goes to `/<code>/login` (one hotel) or asks for the hotel code; a wrong code is refused and stays in the box
+- [ ] sign in on `/<code>/login` → `/<code>/items`; every menu link starts with `/<code>/`; no guest "Support" button on staff pages
+- [ ] an old bookmark (`/settings`) and another hotel's address (`/other/requests`) both land on your own hotel's page
 - [ ] a staff member of another hotel can't sign in on your hotel's page ("Username or password is incorrect")
 - [ ] sign out → your hotel's sign-in page
 - [ ] open a customer report → Settings → Access log shows your name, the reference and the time
+- [ ] first-time setup shows one card per step (Next / Back, steps 1–7); a refused value opens the card it belongs to, with everything typed kept
+- [ ] after setup, `/` shows the guest page (as before)
+- [ ] Settings shows "Customer emails" without a warning a few minutes after the first report (the sender reads the same database as the website)
 - [ ] Settings → Guest contacts lists each test email once (two reports from one address = one row, "2 reports"); support and housekeeping have no Settings; Access log shows "opened the guest contacts list"
 
 **Daily clean-up**

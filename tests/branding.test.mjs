@@ -16,8 +16,8 @@ test('web addresses: lower-case letters, digits, single dashes, 3–40 character
   }
 })
 
-test('the reserved list matches the database’s', () => {
-  const sql = readFileSync(new URL('../db/migrations/20261104000019_hotel_branding.sql', import.meta.url), 'utf8')
+test('the reserved list matches the database’s (latest definition: migration 025)', () => {
+  const sql = readFileSync(new URL('../db/migrations/20261115000025_hotel_paths_email_heartbeat.sql', import.meta.url), 'utf8')
   for (const r of RESERVED_SLUGS) assert.ok(sql.includes(`'${r}'`), r)
 })
 
@@ -34,10 +34,14 @@ test('email colour must be dark enough for white text', () => {
   assert.throws(() => cleanColour('red'), /#1A2B3C/)
 })
 
-test('which hotel: /h/<slug> now; <slug>.foundora.co.uk only once switched on', () => {
+test('which hotel: /<slug> (and the internal /h/<slug>); <slug>.foundora.co.uk only once switched on', () => {
+  assert.equal(hotelSlugFrom({ pathname: '/grand-london' }), 'grand-london')
+  assert.equal(hotelSlugFrom({ pathname: '/grand-london/found' }), 'grand-london')
   assert.equal(hotelSlugFrom({ pathname: '/h/grand-london' }), 'grand-london')
   assert.equal(hotelSlugFrom({ pathname: '/h/grand-london/found' }), 'grand-london')
   assert.equal(hotelSlugFrom({ pathname: '/h/admin' }), null)
+  assert.equal(hotelSlugFrom({ pathname: '/track' }), null)
+  assert.equal(hotelSlugFrom({ pathname: '/items' }), null)
   assert.equal(hotelSlugFrom({ pathname: '/track' }), null)
   assert.equal(hotelSlugFrom({ host: 'grand.foundora.co.uk', pathname: '/' }), null, 'off until HOTEL_SUBDOMAIN_BASE is set')
   const base = 'foundora.co.uk'

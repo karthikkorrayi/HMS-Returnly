@@ -1,4 +1,5 @@
-// Which hotel a guest page is for. Today: the path, foundora.co.uk/h/<slug>.
+// Which hotel a guest page is for. Today: the path, hotel.foundora.co.uk/<slug>
+// (the guest pages in src/app/h/[slug] also pass their own /h/<slug>).
 // Prepared for later: the host, <slug>.foundora.co.uk, once HOTEL_SUBDOMAIN_BASE
 // is set (with the wildcard DNS and Railway domain in place). Pages only ever
 // call hotelSlugFrom(), so switching to subdomains needs no page changes.
@@ -12,7 +13,7 @@ export function hotelSlugFrom(input: { host?: string | null; pathname?: string |
     const sub = host.slice(0, -(base.length + 1))
     if (!sub.includes('.') && isValidSlug(sub)) return sub
   }
-  const m = /^\/h\/([^/?#]+)/.exec(input.pathname ?? '')
+  const m = /^\/(?:h\/)?([^/?#]+)/.exec(input.pathname ?? '')
   if (m) {
     const s = decodeURIComponent(m[1]).toLowerCase()
     if (isValidSlug(s)) return s

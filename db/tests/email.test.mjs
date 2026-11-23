@@ -13,6 +13,7 @@ import { submitReport, reportStatus, friendly } from '../../src/lib/requests/pub
 import { loadEmailLog } from '../../src/lib/email-log.ts'
 import { dispatch, allowlistFrom } from '../../scripts/email/dispatch.mjs'
 import { runDispatch, readConfig } from '../../scripts/email-dispatch.mjs'
+import { loadSenderHeartbeat, senderStatus } from '../../src/lib/email-log.ts'
 import { readFileSync, readdirSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
@@ -188,6 +189,40 @@ if (real) {
     env: { PATH: process.env.PATH, MIGRATION_DATABASE_URL: urlFor('app_owner'), EMAIL_MODE: 'preview', PUBLIC_BASE_URL: 'https://staging.example' } })
   check(r.status === 0 && /✓ done/.test(r.stdout) && !r.stdout.includes('postgresql://'), 'node scripts/email-dispatch.mjs (preview) exits 0 without printing the URL', (r.stdout + r.stderr).slice(-300))
 }
+console.log('\nThe sender’s heartbeat (migration 025)')
+// As if the job had never run against this database (on real Postgres the script was run above).
+await ownerDb.query(`delete from ops.job_runs where job = 'email_dispatch'`)
+const hb0 = await S(MGR, loadSenderHeartbeat)
+check(hb0.finishedAt === null && senderStatus(hb0).state === 'never', 'no run yet: managers are told the sender has never run against this database', JSON.stringify(hb0))
+await A((tx) => submitReport(tx, lost({ email: 'hb@example.com', bookingRef: 'BK-HB' })))
+const waitingNow = await S(MGR, loadSenderHeartbeat)
+check(waitingNow.waiting >= 1 && /never run against this hotel’s database/.test(senderStatus(waitingNow).text) && /MIGRATION_DATABASE_URL/.test(senderStatus(waitingNow).text),
+  'emails waiting and no sender: the message says which setting to check', senderStatus(waitingNow).text)
+const jobLogs = []
+await runDispatch(ownerDb, readConfig({ EMAIL_MODE: 'preview', PUBLIC_BASE_URL: 'https://staging.example' }), { log: (m) => jobLogs.push(m) })
+check(jobLogs.some((m) => /^database: \S+ at \S+ · hotels: .*DEMO.* · \d+ emails? waiting$/.test(m)), 'the log names the database and its hotels (no secrets)', jobLogs.join(' | '))
+check(!jobLogs.join(' ').includes('postgresql://'), '…and never a connection string')
+const hb1 = await S(MGR, loadSenderHeartbeat)
+check(hb1.finishedAt && hb1.ok && hb1.mode === 'preview' && hb1.waiting === 0, 'after a run: when, the mode, and nothing waiting', JSON.stringify(hb1))
+check(senderStatus(hb1).state === 'off', 'preview mode is flagged: customers are not emailed')
+check(senderStatus({ ...hb1, mode: 'live' }).state === 'ok', 'live and recent: all well')
+check(senderStatus({ ...hb1, mode: 'live' }, new Date(hb1.finishedAt.getTime() + 20 * 60_000)).state === 'late', 'no run for 20 minutes: late')
+check(await errOf(() => S(HK, loadSenderHeartbeat)) === '42501', 'only managers can see it')
+check(await errOf(() => A((tx) => tx.query('select * from public.last_email_dispatch()'))) === '42501', 'guests cannot')
+const otherHb = await S(OTHER, loadSenderHeartbeat)
+check(otherHb.waiting === 0, 'another hotel only counts its own waiting emails')
+await ownerDb.query(`insert into ops.job_runs (job, started_at, finished_at, ok) values ('email_dispatch', now() - interval '3 days', now() - interval '3 days', true)`)
+await runDispatch(ownerDb, readConfig({ EMAIL_MODE: 'preview', PUBLIC_BASE_URL: 'https://staging.example' }), { log: () => {} })
+check((await rows(`select count(*)::int as n from ops.job_runs where job = 'email_dispatch' and started_at < now() - interval '2 days'`))[0].n === 0, 'heartbeat rows are kept 2 days')
+check((await rows(`select count(*)::int as n from ops.job_runs where job = 'daily_cleanup'`))[0].n >= 0, 'clean-up runs are untouched')
+
+console.log('\nHotel addresses (migration 025)')
+for (const w of ['items', 'requests', 'staff', 'settings', 'account', 'notifications', 'branding', 'about', 'privacy', 'terms'])
+  check((await rows(`select public._valid_slug($1) as ok`, [w]))[0].ok === false, `“${w}” can't be a hotel's address`)
+check((await rows(`select public._valid_slug('grand-london') as ok`))[0].ok === true, 'an ordinary address still can')
+check(await errOf(() => S(MGR, (tx) => tx.rpc('update_hotel_branding', { p_slug: 'settings', p_colour: null, p_intro: null }))) === 'P0001',
+  'a manager is refused a reserved address with the usual message')
+
 void friendly
 
 if (real) await pool.end()

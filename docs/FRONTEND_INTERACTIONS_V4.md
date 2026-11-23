@@ -33,7 +33,7 @@ post-create item code is displayed once. Reusable dashboard, enquiry and email
 confirmation IDs are generated per instance and associated labels/focus targets
 are updated together.
 
-## Work groups: /h/<hotel>/items/organise
+## Work groups: /<hotel>/items/organise
 
 Managers create, rename, delete and reorder columns. Item-management roles move
 and reorder their own hotel's cards using mouse/touch grips, Move menus, and

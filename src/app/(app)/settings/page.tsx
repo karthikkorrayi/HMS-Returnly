@@ -5,6 +5,7 @@ import { staffPath } from '@/lib/staff-paths'
 import { withStaff } from '@/lib/db'
 import { loadAreas, loadFloors, loadHotelDetails, loadStorage } from '@/lib/hotel-config'
 import { cleanupStatus, loadLastCleanup } from '@/lib/daily-cleanup'
+import { loadSenderHeartbeat, senderStatus } from '@/lib/email-log'
 import ActionForm from '@/components/ActionForm'
 import ReturnlyIcon from '@/components/ReturnlyIcon'
 import { saveSettings } from './actions'
@@ -12,14 +13,16 @@ import { saveHotelDetailsAction } from './config-actions'
 
 export default async function SettingsPage() {
   const { staff, property } = await requireSession(['manager'])
-  const { hotel, floors, areas, storage, lastCleanup } = await withStaff(staff.user_id, async (tx) => ({
+  const { hotel, floors, areas, storage, lastCleanup, heartbeat } = await withStaff(staff.user_id, async (tx) => ({
     hotel: await loadHotelDetails(tx),
     floors: await loadFloors(tx),
     areas: await loadAreas(tx),
     storage: await loadStorage(tx),
     lastCleanup: await loadLastCleanup(tx),
+    heartbeat: await loadSenderHeartbeat(tx),
   }))
   const cleanup = cleanupStatus(lastCleanup)
+  const sender = senderStatus(heartbeat)
   const rooms = floors.floors.reduce((n, f) => n + f.rooms.filter((r) => r.active).length, 0) + floors.unassigned.filter((r) => r.active).length
 
   const retention = [
@@ -143,6 +146,10 @@ export default async function SettingsPage() {
           <p className="font-semibold">Daily clean-up{cleanup.state === 'ok' ? '' : ' needs attention'}</p>
           <p className="mt-0.5">{cleanup.text}</p>
           <p className="hint mt-1">Every night it removes expired guest stays, closed enquiries past the time above, and old sign-in records. Lost items and photos are never removed automatically.</p>
+        </div>
+        <div className={`mt-3 rounded-xl p-3 text-sm ${sender.state === 'ok' ? 'bg-paper' : 'bg-attention-soft text-attention'}`} role={sender.state === 'ok' ? undefined : 'alert'}>
+          <p className="font-semibold">Customer emails{sender.state === 'ok' ? '' : ' need attention'}</p>
+          <p className="mt-0.5">{sender.text}</p>
         </div>
       </section>
     </div>
