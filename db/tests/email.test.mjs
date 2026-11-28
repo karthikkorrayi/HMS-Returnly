@@ -1,6 +1,6 @@
 // Run with: npm run test:db
 // PR C: customer emails through the outbox (migration 017) and the dispatcher
-// (scripts/email/dispatch.mjs, scripts/email-dispatch.mjs). Brevo is replaced
+// (scripts/email/dispatch.mjs, scripts/email-dispatch.mjs). Resend is replaced
 // by a fake; nothing leaves the machine. Checks which events queue an email,
 // that nothing is emailed twice, preview / allowlist / live, retries, a bad
 // API key, expiry, the per-email tracking token, what is stored, and who can
@@ -11,7 +11,7 @@ import { createDb } from '../../src/lib/db/core.ts'
 import { returnlyTypes } from '../../src/lib/db/pg-types.ts'
 import { submitReport, reportStatus, friendly } from '../../src/lib/requests/public-queries.ts'
 import { loadEmailLog } from '../../src/lib/email-log.ts'
-import { dispatch, allowlistFrom } from '../../scripts/email/dispatch.mjs'
+import { dispatch, allowlistFrom, emailToken, idempotencyKey } from '../../scripts/email/dispatch.mjs'
 import { runDispatch, readConfig } from '../../scripts/email-dispatch.mjs'
 import { loadSenderHeartbeat, senderStatus } from '../../src/lib/email-log.ts'
 import { readFileSync, readdirSync } from 'node:fs'
@@ -110,17 +110,19 @@ check(!prev.body_text.includes('Ann Guest') && !prev.body_text.includes('BK-1') 
   'no name, booking ID or staff message text in the email')
 check(prev.sender === 'Demo Hotel via Foundora <notifications@foundora.co.uk>' || /via Foundora <notifications@foundora\.co\.uk>$/.test(prev.sender), 'sender: "<Hotel> via Foundora <notifications@…>"', prev.sender)
 
-console.log('\nLive mode with a fake Brevo')
+console.log('\nLive mode with a fake Resend')
 const sent = []
-const okSend = async (m) => { sent.push(m); return { ok: true, messageId: `<m${sent.length}@brevo>` } }
+const okSend = async (m) => { sent.push(m); return { ok: true, messageId: `re-id-${sent.length}` } }
+const SECRET = 'test-link-secret-'.padEnd(48, 'x')
 const C = await A((tx) => submitReport(tx, lost({ email: 'carol@example.com', bookingRef: 'BK-3' })))
 const D = await A((tx) => submitReport(tx, lost({ email: 'dave@other.example', bookingRef: 'BK-4' })))
-const live = (send, extra = {}) => dispatch(ownerDb, { mode: 'live', baseUrl: 'https://staging.example', from: { email: 'notifications@foundora.co.uk', name: 'Foundora' }, send, log: () => {}, ...extra })
+const live = (send, extra = {}) => dispatch(ownerDb, { mode: 'live', baseUrl: 'https://staging.example', from: { email: 'notifications@foundora.co.uk', name: 'Foundora' }, send, linkSecret: SECRET, pauseMs: 0, log: () => {}, ...extra })
 const r1 = await live(okSend, { allow: allowlistFrom('carol@example.com, @hotel.example') })
 check(r1.sent === 1 && sent.length === 1 && sent[0].to === 'carol@example.com', 'only allowlisted addresses are sent on staging', JSON.stringify(r1))
 check((await outbox(D.reference))[0].status === 'skipped', 'others are recorded as skipped, not sent')
 const c0 = (await outbox(C.reference))[0]
-check(c0.status === 'sent' && c0.provider_message_id === '<m1@brevo>' && c0.sent_at, 'sent: Brevo’s message id and time recorded')
+check(c0.status === 'sent' && c0.provider === 'resend' && c0.provider_message_id === 're-id-1' && c0.sent_at, 'sent: Resend’s email id and time recorded')
+check(sent[0].idempotencyKey === idempotencyKey(SECRET, c0.id), 'each email carries its own idempotency key', sent[0].idempotencyKey)
 const link = /https:\/\/staging\.example\/track\?ref=(LF-[0-9A-F-]+)#t=([0-9a-f]{64})/.exec(sent[0].text)
 check(link && link[1] === C.reference, 'the email carries a tracking link with its own token')
 check(link && (await A((tx) => reportStatus(tx, C.reference, link[2]))).reference === C.reference, 'that link opens the report')
@@ -128,25 +130,50 @@ check(!JSON.stringify(await rows(`select * from public.email_outbox`)).includes(
 check(sent[0].html.includes(C.reference) && sent[0].html.includes('View your report') && sent[0].from.name.endsWith('via Foundora'), 'HTML version with the reference and button')
 const again = await live(okSend, { allow: allowlistFrom('carol@example.com') })
 check(again.sent === 0 && sent.length === 1, 'running again sends nothing twice')
+check(link && link[2] === emailToken(SECRET, c0.id), 'the link token is the email’s own (outbox row + secret)')
+// The on-screen link from submission keeps working next to the email’s link.
+check((await A((tx) => reportStatus(tx, C.reference, C.token))).reference === C.reference, 'the link shown at submission still works too')
+const Dz = (await outbox(D.reference))[0]
+check(!link || emailToken(SECRET, Dz.id) !== link[2], 'another report’s email would get a different link')
+check(!link || (await errOf(() => A((tx) => reportStatus(tx, D.reference, link[2])))) !== '', 'a link never opens another report')
 
 console.log('\nFailures and retries')
 const E = await A((tx) => submitReport(tx, lost({ email: 'erin@example.com', bookingRef: 'BK-5' })))
-const busy = async () => ({ ok: false, permanent: false, code: 'http_503' })
+const tries = []
+const busy = async (m) => { tries.push(m); return { ok: false, kind: 'retry', code: 'http_503' } }
 await live(busy, { allow: allowlistFrom('erin@example.com') })
 let e0 = (await outbox(E.reference))[0]
 check(e0.status === 'retry' && e0.attempts === 1 && e0.last_error === 'http_503' && new Date(e0.next_attempt_at) > new Date(), 'a temporary failure is retried later (1 minute)')
+await ownerDb.query(`update public.email_outbox set next_attempt_at = now() where id = $1`, [e0.id])
+await live(busy, { allow: allowlistFrom('erin@example.com') })
+check(tries.length === 2 && tries[0].text === tries[1].text && tries[0].html === tries[1].html && tries[0].idempotencyKey === tries[1].idempotencyKey,
+  'a retry sends exactly the same email with the same idempotency key (same tracking link): Resend can drop a duplicate')
+check((await rows(`select count(*)::int as n from public.request_access_tokens t join public.customer_requests r on r.id = t.request_id where r.reference = $1`, [E.reference]))[0].n === 1,
+  'retries add no extra tracking tokens', '')
 await ownerDb.query(`update public.email_outbox set next_attempt_at = now(), attempts = 5 where id = $1`, [e0.id])
 await live(busy, { allow: allowlistFrom('erin@example.com') })
 e0 = (await outbox(E.reference))[0]
 check(e0.status === 'failed' && e0.attempts === 6, 'after 6 attempts it is marked failed')
 const G = await A((tx) => submitReport(tx, lost({ email: 'gary@example.com', bookingRef: 'BK-6' })))
 const H = await A((tx) => submitReport(tx, lost({ email: 'gary2@example.com', bookingRef: 'BK-7' })))
-const badKey = async () => ({ ok: false, permanent: true, code: 'http_401:unauthorized' })
+const badKey = async () => ({ ok: false, kind: 'config', code: 'http_403:invalid_api_key' })
 const bk = await live(badKey, { allow: allowlistFrom('@example.com') })
 const g0 = (await outbox(G.reference))[0], h0 = (await outbox(H.reference))[0]
-check(bk.stopped && g0.status === 'retry' && h0.status === 'retry', 'a wrong API key stops the run and keeps every email for later', `${g0.status} ${h0.status}`)
+check(bk.stopped && bk.stopReason === 'refused' && g0.status === 'retry' && h0.status === 'retry', 'a wrong API key stops the run and keeps every email for later', `${g0.status} ${h0.status}`)
+check(g0.attempts === 0 && h0.attempts === 0, 'a refused key does not use up the emails’ attempts', `${g0.attempts} ${h0.attempts}`)
+await ownerDb.query(`update public.email_outbox set next_attempt_at = now() where id = any($1::bigint[])`, [[g0.id, h0.id]])
+const qr = await live(async () => ({ ok: false, kind: 'quota', code: 'http_429:daily_quota_exceeded' }), { allow: allowlistFrom('@example.com') })
+check(qr.stopped && qr.stopReason === 'quota' && (await outbox(G.reference))[0].status === 'retry' && (await outbox(G.reference))[0].attempts === 0,
+  'the daily quota stops the run, keeps the emails and uses no attempts')
+await ownerDb.query(`update public.email_outbox set next_attempt_at = now() where id = any($1::bigint[])`, [[g0.id, h0.id]])
+let rated = 0
+await live(async () => (rated++ === 0 ? { ok: false, kind: 'rate', code: 'http_429:rate_limit_exceeded', retryAfter: 0.01 } : { ok: true, messageId: 're-r' }),
+  { allow: allowlistFrom('gary@example.com, gary2@example.com') })
+const gA = (await outbox(G.reference))[0], hA = (await outbox(H.reference))[0]
+check([gA.status, hA.status].sort().join() === 'retry,sent' && [gA, hA].find((x) => x.status === 'retry').attempts === 0,
+  'too many requests: that email waits a moment without losing an attempt; the run goes on', `${gA.status}/${gA.attempts} ${hA.status}/${hA.attempts}`)
 const I = await A((tx) => submitReport(tx, lost({ email: 'ivy@example.com', bookingRef: 'BK-8' })))
-await live(async () => ({ ok: false, permanent: true, code: 'http_400:invalid_parameter' }), { allow: allowlistFrom('ivy@example.com') })
+await live(async () => ({ ok: false, kind: 'permanent', code: 'http_422:validation_error' }), { allow: allowlistFrom('ivy@example.com') })
 check((await outbox(I.reference))[0].status === 'failed', 'a permanent error (bad address) fails without retrying')
 await ownerDb.query(`update public.email_outbox set status = 'queued', created_at = now() - interval '2 days' where id = $1`, [g0.id])
 await dispatch(ownerDb, { mode: 'off', baseUrl: 'https://x.example', from: { email: 'a@b.co', name: 'F' }, send: noSend, log: () => {} })
@@ -162,7 +189,7 @@ if (real) {
   const other = await connectAs('app_owner')
   const got = []
   const slow = async (m) => { got.push(m.to); await new Promise((r) => setTimeout(r, 20)); return { ok: true, messageId: 'x' } }
-  const opts = { mode: 'live', baseUrl: 'https://s.example', from: { email: 'n@f.co', name: 'F' }, allow: allowlistFrom('@example.com'), send: slow, log: () => {} }
+  const opts = { mode: 'live', baseUrl: 'https://s.example', from: { email: 'n@f.co', name: 'F' }, allow: allowlistFrom('@example.com'), send: slow, linkSecret: SECRET, pauseMs: 0, log: () => {} }
   await Promise.all([dispatch(ownerDb, opts), dispatch(other, opts)])
   const par = got.filter((t) => t.startsWith('par'))
   check(par.length === 6 && new Set(par).size === 6, 'each email sent exactly once', String(par.length))
@@ -180,9 +207,9 @@ check(await errOf(() => S(MGR, (tx) => tx.query('select * from public.request_ac
 console.log('\nThe job itself')
 check(/must log in as app_owner/.test(await errOf(() => runDispatch({ query: (s) => db.query(s) }, readConfig({ EMAIL_MODE: 'preview' })))),
   'refuses any login but app_owner')
-check(readConfig({ EMAIL_MODE: 'live', BREVO_API_KEY: 'xsmtpsib-abc', EMAIL_FROM: 'notifications@foundora.co.uk', PUBLIC_BASE_URL: 'https://a.example', EMAIL_ALLOWLIST: 'a@b.co' })
-  .problems.some((p) => /SMTP key/.test(p)), 'an SMTP key is refused with a clear message')
-check(readConfig({ EMAIL_MODE: 'live', BREVO_API_KEY: 'xkeysib-abc', EMAIL_FROM: 'notifications@foundora.co.uk', PUBLIC_BASE_URL: 'https://a.example', RAILWAY_ENVIRONMENT_NAME: 'staging' })
+check(readConfig({ EMAIL_MODE: 'live', RESEND_API_KEY: 'xkeysib-abc', EMAIL_LINK_SECRET: SECRET, EMAIL_FROM: 'notifications@foundora.co.uk', PUBLIC_BASE_URL: 'https://a.example', EMAIL_ALLOWLIST: 'a@b.co' })
+  .problems.some((p) => /does not look like a Resend API key/.test(p)), 'a key that is not a Resend key is refused with a clear message')
+check(readConfig({ EMAIL_MODE: 'live', RESEND_API_KEY: 're_abcdefgh123', EMAIL_LINK_SECRET: SECRET, EMAIL_FROM: 'notifications@foundora.co.uk', PUBLIC_BASE_URL: 'https://a.example', RAILWAY_ENVIRONMENT_NAME: 'staging' })
   .problems.some((p) => /EMAIL_ALLOWLIST is required/.test(p)), 'live on staging refuses to start without an allowlist')
 if (real) {
   const r = spawnSync(process.execPath, ['scripts/email-dispatch.mjs'], { cwd: ROOT, encoding: 'utf8', timeout: 30000,

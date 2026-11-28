@@ -29,7 +29,7 @@ For an independently managed deployment, use the existing documented migration
 process with the app_owner connection. Do not change already-applied migrations.
 
 Existing Postgres, Better Auth, S3, and email-worker configuration is retained.
-Hotel uploads require the existing private photo bucket credentials. Brevo
+Hotel uploads require the existing private photo bucket credentials. Email
 sending still uses the existing email worker; this patch does not send email.
 Logo management is at Settings → Branding and is restricted to managers.
 Default uploads back transparent images with white; dark uploads use navy.

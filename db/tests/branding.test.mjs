@@ -111,7 +111,7 @@ const R = await A((tx) => submitReport(tx, { innCode: 'DEMO', reportType: 'lost'
   description: 'Blue wool scarf', category: null, colour: null, brand: null, location: null, date: null, customerName: 'Ann Guest', bookingRef: 'BK-1', whereabouts: null }))
 const sent = []
 await dispatch(ownerDb, { mode: 'live', baseUrl: 'https://staging.example', from: { email: 'notifications@foundora.co.uk', name: 'Foundora' },
-  send: async (m) => { sent.push(m); return { ok: true, messageId: 'x' } }, log: () => {} })
+  send: async (m) => { sent.push(m); return { ok: true, messageId: 'x' } }, linkSecret: 'branding-test-link-secret'.padEnd(40, 'x'), pauseMs: 0, log: () => {} })
 const mail = sent.find((m) => m.html.includes(R.reference))
 check(mail && mail.html.includes('https://staging.example/brand/grand-london/logo?v=2'), 'the email shows the hotel’s logo')
 check(mail && mail.html.includes('#0b3d2e'), '…in the hotel’s colour')

@@ -7,16 +7,18 @@
 // Variables (values are never printed):
 //   MIGRATION_DATABASE_URL  logs in as app_owner (required)
 //   EMAIL_MODE              off | preview | live          (default: off)
-//   BREVO_API_KEY           Brevo API key (live only; an API key, not an SMTP key)
+//   RESEND_API_KEY          Resend API key, re_… (live only; "Sending access" for the domain is enough)
+//   EMAIL_LINK_SECRET       at least 32 random characters (live only). Makes each email's
+//                           tracking link the same on every retry; keep it secret like a key
 //   EMAIL_FROM              sender address, e.g. notifications@foundora.co.uk (live)
 //   EMAIL_FROM_NAME         shown after the hotel name: "<Hotel> via Foundora"
 //   PUBLIC_BASE_URL         https://… address of the app, for the tracking links
 //   EMAIL_ALLOWLIST         comma list of addresses or @domains; on staging, live
 //                           mode refuses to start without it
-// Exit code: 0 done, 1 failed (database/Brevo), 2 set-up problem.
+// Exit code: 0 done, 1 failed (database/Resend), 2 set-up problem.
 import { fileURLToPath } from 'node:url'
 import { dispatch, allowlistFrom } from './email/dispatch.mjs'
-import { sendViaBrevo } from './email/brevo.mjs'
+import { sendViaResend } from './email/resend.mjs'
 
 const MODES = ['off', 'preview', 'live']
 const EMAIL = /^[a-z0-9._%+'-]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/
@@ -32,17 +34,21 @@ export function readConfig(env = process.env) {
   const allow = allowlistFrom(env.EMAIL_ALLOWLIST)
   const staging = /staging/i.test(env.RAILWAY_ENVIRONMENT_NAME || '')
   if (mode === 'live') {
-    if (!env.BREVO_API_KEY) problems.push('BREVO_API_KEY is not set')
-    else if (/^xsmtpsib-/.test(env.BREVO_API_KEY)) problems.push('BREVO_API_KEY is an SMTP key; create an API key in Brevo (SMTP & API → API keys)')
+    const key = (env.RESEND_API_KEY || '').trim()
+    if (!key) problems.push('RESEND_API_KEY is not set')
+    else if (!/^re_[A-Za-z0-9_]{8,}$/.test(key)) problems.push('RESEND_API_KEY does not look like a Resend API key (re_…)')
+    if ((env.EMAIL_LINK_SECRET || '').trim().length < 32) problems.push('EMAIL_LINK_SECRET must be at least 32 random characters')
+    if (env.BREVO_API_KEY) problems.push('BREVO_API_KEY is still set: Brevo is no longer used; remove it from this service')
     if (!EMAIL.test(fromEmail)) problems.push('EMAIL_FROM is not a valid address')
     if (!/^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(baseUrl)) problems.push('PUBLIC_BASE_URL must be https://<domain> (no path)')
     if (staging && !allow) problems.push('EMAIL_ALLOWLIST is required for live mode on staging')
   }
   if (mode === 'preview' && baseUrl && !/^https?:\/\//.test(baseUrl)) problems.push('PUBLIC_BASE_URL must start with https://')
-  return { problems, mode, baseUrl: baseUrl || 'https://example.invalid', from: { email: fromEmail, name: fromName }, allow, apiKey: env.BREVO_API_KEY }
+  return { problems, mode, baseUrl: baseUrl || 'https://example.invalid', from: { email: fromEmail, name: fromName }, allow,
+    apiKey: (env.RESEND_API_KEY || '').trim(), linkSecret: (env.EMAIL_LINK_SECRET || '').trim() }
 }
 
-export async function runDispatch(db, cfg, { send = sendViaBrevo, log = console.log } = {}) {
+export async function runDispatch(db, cfg, { send = sendViaResend, log = console.log, pauseMs } = {}) {
   const who = (await db.query(`select current_user as name, r.rolsuper as superuser from pg_roles r where r.rolname = current_user`)).rows[0]
   if (who.name !== 'app_owner' || who.superuser) {
     throw new Error(`connected as ${who.name}; the email job must log in as app_owner (MIGRATION_DATABASE_URL)`)
@@ -57,7 +63,7 @@ export async function runDispatch(db, cfg, { send = sendViaBrevo, log = console.
             (select count(*)::int from public.email_outbox where status in ('queued', 'retry')) as waiting`)).rows[0]
   log(`database: ${here.db} at ${here.addr} · hotels: ${here.hotels} · ${here.waiting} email${here.waiting === 1 ? '' : 's'} waiting`)
   const summary = await dispatch(db, {
-    mode: cfg.mode, baseUrl: cfg.baseUrl, from: cfg.from, allow: cfg.allow, log,
+    mode: cfg.mode, baseUrl: cfg.baseUrl, from: cfg.from, allow: cfg.allow, log, linkSecret: cfg.linkSecret, pauseMs,
     send: (m) => send({ ...m, apiKey: cfg.apiKey }),
   })
   // Heartbeat (migration 025): Settings → Customer emails shows when the
@@ -66,7 +72,7 @@ export async function runDispatch(db, cfg, { send = sendViaBrevo, log = console.
     `insert into ops.job_runs (job, finished_at, ok, summary)
      values ('email_dispatch', now(), $1, $2::jsonb)`,
     [!summary.stopped, JSON.stringify({ mode: cfg.mode, sent: summary.sent, previewed: summary.previewed, skipped: summary.skipped,
-      retry: summary.retry, failed: summary.failed, expired: summary.expired, stopped: summary.stopped })])
+      retry: summary.retry, failed: summary.failed, expired: summary.expired, stopped: summary.stopped, stop_reason: summary.stopReason })])
   await db.query(`delete from ops.job_runs where job = 'email_dispatch' and started_at < now() - interval '2 days'`)
   return summary
 }
