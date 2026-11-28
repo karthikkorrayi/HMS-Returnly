@@ -66,7 +66,7 @@ export async function loadEmailLog(tx: Tx, limit = 50): Promise<EmailLogRow[]> {
 /** The sender runs every 5 minutes; after 15 without a run it is "late". */
 export const SENDER_LATE_MINUTES = 15
 
-export type SenderHeartbeat = { finishedAt: Date | null; ok: boolean; mode: string | null; waiting: number; oldestWaiting: Date | null }
+export type SenderHeartbeat = { finishedAt: Date | null; ok: boolean; mode: string | null; waiting: number; oldestWaiting: Date | null; stopReason?: string | null }
 export type SenderStatus = { state: 'ok' | 'late' | 'never' | 'off'; text: string }
 
 export function senderStatus(h: SenderHeartbeat, now: Date = new Date()): SenderStatus {
@@ -84,18 +84,24 @@ export function senderStatus(h: SenderHeartbeat, now: Date = new Date()): Sender
   if (h.mode && h.mode !== 'live') {
     return { state: 'off', text: `The email sender ran ${ago} in “${h.mode}” mode: customers are not being emailed. Set EMAIL_MODE=live on “email-dispatch”.` }
   }
-  if (!h.ok) return { state: 'late', text: `The email sender ran ${ago} but stopped early (Brevo refused the API key). ${h.waiting ? waiting + '.' : ''}` }
+  if (!h.ok) {
+    const why = h.stopReason === 'quota'
+      ? 'the Resend sending quota for today or this month is used up; emails wait and go out once it resets'
+      : 'Resend refused the request: check RESEND_API_KEY and EMAIL_FROM on “email-dispatch”, and that the domain is verified in Resend'
+    return { state: 'late', text: `The email sender ran ${ago} but stopped early (${why}).${h.waiting ? ` ${waiting}.` : ''}` }
+  }
   return { state: 'ok', text: `Email sender checked ${ago}.${h.waiting ? ` ${waiting} (next attempt soon).` : ''}` }
 }
 
 export async function loadSenderHeartbeat(tx: Tx): Promise<SenderHeartbeat> {
-  const { rows } = await tx.query<{ finished_at: Date | string | null; ok: boolean | null; summary: { mode?: string } | null; waiting: number; oldest_waiting: Date | string | null }>(
+  const { rows } = await tx.query<{ finished_at: Date | string | null; ok: boolean | null; summary: { mode?: string; stop_reason?: string | null } | null; waiting: number; oldest_waiting: Date | string | null }>(
     'select finished_at, ok, summary, waiting, oldest_waiting from public.last_email_dispatch()')
   const r = rows[0]
   return {
     finishedAt: r?.finished_at ? new Date(r.finished_at) : null,
     ok: r?.ok ?? false,
     mode: r?.summary?.mode ?? null,
+    stopReason: r?.summary?.stop_reason ?? null,
     waiting: r?.waiting ?? 0,
     oldestWaiting: r?.oldest_waiting ? new Date(r.oldest_waiting) : null,
   }

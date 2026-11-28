@@ -29,5 +29,7 @@ test('late after 15 minutes', () => {
 test('not live, or the key refused: flagged', () => {
   assert.equal(senderStatus(hb({ mode: 'preview' }), now).state, 'off')
   assert.equal(senderStatus(hb({ mode: 'off' }), now).state, 'off')
-  assert.match(senderStatus(hb({ ok: false }), now).text, /Brevo refused the API key/)
+  assert.match(senderStatus(hb({ ok: false }), now).text, /Resend refused the request: check RESEND_API_KEY/)
+  assert.match(senderStatus(hb({ ok: false, stopReason: 'quota' }), now).text, /sending quota/)
+  assert.doesNotMatch(senderStatus(hb({ ok: false }), now).text, /Brevo/)
 })

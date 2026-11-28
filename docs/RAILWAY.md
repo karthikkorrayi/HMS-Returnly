@@ -182,8 +182,8 @@ MIGRATION_DATABASE_URL=postgresql://app_owner:${{shared.APP_OWNER_PASSWORD}}@${{
 
 Sends the customer emails the database has queued (migration 017: report
 received, contact required, new message, under review, matched, closed,
-resolved) through **Brevo's HTTPS API**. Railway blocks outbound SMTP below
-the Pro plan, so SMTP keys are not used. Sender: `notifications@foundora.co.uk`,
+resolved) through **Resend's HTTPS API** (`POST https://api.resend.com/emails`).
+Railway blocks outbound SMTP below the Pro plan, so SMTP is not used. Sender: `notifications@foundora.co.uk`,
 shown as "<Hotel> via Foundora". Each email carries its own private tracking
 link; the copy kept in the database has the link blanked out. Managers see the
 log under Settings → Customer emails.
@@ -205,7 +205,8 @@ EMAIL_MODE=preview
 EMAIL_FROM=notifications@foundora.co.uk
 EMAIL_FROM_NAME=Foundora
 PUBLIC_BASE_URL=https://${{web.RAILWAY_PUBLIC_DOMAIN}}
-BREVO_API_KEY=${{shared.BREVO_API_KEY}}
+RESEND_API_KEY=${{shared.RESEND_API_KEY}}
+EMAIL_LINK_SECRET=${{shared.EMAIL_LINK_SECRET}}
 EMAIL_ALLOWLIST=<your own test addresses, comma-separated>
 ```
 
@@ -213,12 +214,22 @@ EMAIL_ALLOWLIST=<your own test addresses, comma-separated>
   shown under Settings → Customer emails, **nothing is sent**), `live` (sent).
   Staging stays on `preview` until the live test; on staging, `live` refuses to
   start without `EMAIL_ALLOWLIST` and sends only to the addresses on it.
-- `BREVO_API_KEY` is a Brevo **API key** (starts `xkeysib-`), one per
-  environment, kept in that environment's Shared Variables. An SMTP key
-  (`xsmtpsib-`) is refused with a clear message.
-- Retries: 1, 5, 15, 60, 360 minutes; at most 6 attempts. A refused API key
-  (401/403) stops the run and keeps every email for the next one. An email
-  still waiting after a day is marked "expired" instead of arriving late.
+- `RESEND_API_KEY` is a Resend **API key** (starts `re_`) with **Sending
+  access** for the domain `foundora.co.uk` only, one per environment, kept in
+  that environment's Shared Variables. A leftover `BREVO_API_KEY` is refused
+  with a clear message.
+- `EMAIL_LINK_SECRET`: at least 32 random characters, different per
+  environment (`openssl rand -hex 32`). Each email's tracking token is
+  HMAC-SHA256(secret, "outbox:<row id>"), so a retry sends exactly the same
+  email and Resend's idempotency key (also per row) stops a duplicate. Only
+  the token's SHA-256 is stored; earlier links stay valid. Keep it secret.
+- Retries: 1, 5, 15, 60, 360 minutes; at most 6 attempts. A refused key or
+  unverified domain (401/403) or a used-up quota stops the run and keeps every
+  email without using up attempts; "too many requests" waits as Resend asks.
+  An email still waiting after a day is marked "expired" instead of arriving late.
+- "sent" means **accepted by Resend**, not delivered: Resend → Emails shows
+  Delivered / Bounced. Test a key from your computer with
+  `RESEND_API_KEY=… npm run email:test-send -- --to you@example.com`.
 - Log of a good run: `emails: sent N, previewed N, …` then `✓ done`.
 - Same `app_owner` trade-off as `daily-cleanup`; a dedicated role with only
   the sending rights is the planned improvement.

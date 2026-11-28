@@ -1,11 +1,11 @@
-// PR C without a database: the email templates, the Brevo client's handling
+// Without a database: the email templates, the Resend client's handling
 // of every kind of answer (with a fake fetch; nothing is sent), the job's
 // configuration checks, the allowlist and the retry timing.
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { renderEmail, TEMPLATES } from '../scripts/email/templates.mjs'
-import { sendViaBrevo, BREVO_URL } from '../scripts/email/brevo.mjs'
-import { allowlistFrom, backoffMinutes, MAX_ATTEMPTS } from '../scripts/email/dispatch.mjs'
+import { sendViaResend, RESEND_URL, formatFrom } from '../scripts/email/resend.mjs'
+import { allowlistFrom, backoffMinutes, MAX_ATTEMPTS, emailToken, idempotencyKey } from '../scripts/email/dispatch.mjs'
 import { readConfig } from '../scripts/email-dispatch.mjs'
 import { maskEmail } from '../src/lib/email-log.ts'
 
@@ -63,30 +63,71 @@ test('unknown templates are refused', () => {
   assert.throws(() => renderEmail({ ...base, template: 'marketing' }), /unknown email template/)
 })
 
-const fakeFetch = (status, body) => async (url, init) => {
+const fakeFetch = (status, body, headers = {}) => async (url, init) => {
   fakeFetch.last = { url, init }
-  return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
+  return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', ...headers } })
 }
-const mail = { apiKey: 'xkeysib-test', from: { email: 'notifications@foundora.co.uk', name: 'The Grand via Foundora' }, to: 'a@b.co', subject: 's', html: '<p>h</p>', text: 't', tag: 'received' }
+const KEY = 're_unitTestKey_not_real_123'
+const mail = { apiKey: KEY, from: { email: 'notifications@foundora.co.uk', name: 'The Grand via Foundora' }, to: 'a@b.co',
+  subject: 's', html: '<p>h</p>', text: 't', tag: 'received', idempotencyKey: 'foundora-abc-outbox-7' }
 
-test('Brevo: 201 is sent, with the message id; the request is shaped as Brevo expects', async () => {
-  const r = await sendViaBrevo({ ...mail, fetchImpl: fakeFetch(201, { messageId: '<x@relay>' }) })
-  assert.deepEqual(r, { ok: true, messageId: '<x@relay>' })
-  assert.equal(fakeFetch.last.url, BREVO_URL)
-  assert.equal(fakeFetch.last.init.headers['api-key'], 'xkeysib-test')
+test('Resend: 200 is accepted, with the email id; the request is shaped as Resend expects', async () => {
+  const r = await sendViaResend({ ...mail, fetchImpl: fakeFetch(200, { id: '49a3999c-0ce1-4ea6-ab68-afcd6dc2e794' }) })
+  assert.deepEqual(r, { ok: true, messageId: '49a3999c-0ce1-4ea6-ab68-afcd6dc2e794' })
+  assert.equal(fakeFetch.last.url, RESEND_URL)
+  assert.equal(fakeFetch.last.url, 'https://api.resend.com/emails')
+  assert.equal(fakeFetch.last.init.method, 'POST')
+  assert.equal(fakeFetch.last.init.headers.authorization, `Bearer ${KEY}`)
+  assert.equal(fakeFetch.last.init.headers['idempotency-key'], 'foundora-abc-outbox-7')
   const body = JSON.parse(fakeFetch.last.init.body)
-  assert.deepEqual(body.to, [{ email: 'a@b.co' }])
-  assert.equal(body.sender.email, 'notifications@foundora.co.uk')
-  assert.ok(body.htmlContent && body.textContent && body.subject)
+  assert.deepEqual(body.to, ['a@b.co'])
+  assert.equal(body.from, '"The Grand via Foundora" <notifications@foundora.co.uk>')
+  assert.ok(body.html && body.text && body.subject)
+  assert.deepEqual(body.tags, [{ name: 'template', value: 'received' }])
+  assert.ok(!fakeFetch.last.init.body.includes(KEY), 'the key is only in the header')
 })
 
-test('Brevo: 429 and 5xx are retried; 400 is permanent; the code is kept, never the request', async () => {
-  assert.deepEqual(await sendViaBrevo({ ...mail, fetchImpl: fakeFetch(429, {}) }), { ok: false, permanent: false, code: 'http_429' })
-  assert.deepEqual(await sendViaBrevo({ ...mail, fetchImpl: fakeFetch(502, {}) }), { ok: false, permanent: false, code: 'http_502' })
-  const bad = await sendViaBrevo({ ...mail, fetchImpl: fakeFetch(400, { code: 'invalid_parameter', message: 'email a@b.co is not valid' }) })
-  assert.deepEqual(bad, { ok: false, permanent: true, code: 'http_400:invalid_parameter' })
-  const net = await sendViaBrevo({ ...mail, fetchImpl: async () => { throw new TypeError('fetch failed') } })
-  assert.deepEqual(net, { ok: false, permanent: false, code: 'network' })
+test('Resend: sender names are quoted safely and can never add headers', () => {
+  assert.equal(formatFrom({ name: 'Smith, Jones & "Co" via Foundora', email: 'n@f.co.uk' }), '"Smith, Jones & \\"Co\\" via Foundora" <n@f.co.uk>')
+  assert.equal(formatFrom({ name: 'Evil\r\nBcc: x@y.z', email: 'n@f.co.uk' }), '"Evil Bcc: x@y.z" <n@f.co.uk>')
+  assert.equal(formatFrom({ name: '', email: 'n@f.co.uk' }), 'n@f.co.uk')
+})
+
+test('Resend: every kind of answer is classified; only the short error name is kept', async () => {
+  const kind = async (status, body = {}, headers = {}) => sendViaResend({ ...mail, fetchImpl: fakeFetch(status, body, headers) })
+  assert.deepEqual(await kind(401, { name: 'missing_api_key', message: 'Missing API key' }), { ok: false, kind: 'config', code: 'http_401:missing_api_key' })
+  assert.deepEqual(await kind(403, { name: 'invalid_api_key' }), { ok: false, kind: 'config', code: 'http_403:invalid_api_key' })
+  assert.deepEqual(await kind(403, { name: 'validation_error', message: 'The foundora.co.uk domain is not verified' }), { ok: false, kind: 'config', code: 'http_403:validation_error' })
+  assert.deepEqual(await kind(422, { name: 'invalid_from_address' }), { ok: false, kind: 'config', code: 'http_422:invalid_from_address' })
+  assert.deepEqual(await kind(422, { name: 'validation_error', message: 'Invalid `to` field' }), { ok: false, kind: 'permanent', code: 'http_422:validation_error' })
+  assert.deepEqual(await kind(429, { name: 'rate_limit_exceeded' }, { 'retry-after': '2' }), { ok: false, kind: 'rate', code: 'http_429:rate_limit_exceeded', retryAfter: 2 })
+  assert.equal((await kind(429, { name: 'rate_limit_exceeded' })).retryAfter, 1, 'no header: wait 1 second')
+  assert.deepEqual(await kind(429, { name: 'daily_quota_exceeded' }), { ok: false, kind: 'quota', code: 'http_429:daily_quota_exceeded' })
+  assert.deepEqual(await kind(429, { name: 'monthly_quota_exceeded' }), { ok: false, kind: 'quota', code: 'http_429:monthly_quota_exceeded' })
+  assert.deepEqual(await kind(409, { name: 'concurrent_idempotent_requests' }), { ok: false, kind: 'retry', code: 'http_409:concurrent_idempotent_requests' })
+  assert.deepEqual(await kind(409, { name: 'invalid_idempotent_request' }), { ok: false, kind: 'permanent', code: 'http_409:invalid_idempotent_request' })
+  assert.deepEqual(await kind(500, { name: 'internal_server_error' }), { ok: false, kind: 'retry', code: 'http_500:internal_server_error' })
+  assert.deepEqual(await sendViaResend({ ...mail, fetchImpl: async () => { throw new TypeError('fetch failed') } }), { ok: false, kind: 'retry', code: 'network' })
+  // A request cut off by the 15-second limit (AbortSignal.timeout) rejects with a TimeoutError.
+  let given
+  const slow = await sendViaResend({ ...mail, fetchImpl: async (u, init) => { given = init.signal; throw new DOMException('timed out', 'TimeoutError') } })
+  assert.ok(given instanceof AbortSignal, 'every request has a time limit')
+  assert.deepEqual(slow, { ok: false, kind: 'retry', code: 'timeout' })
+  const leak = await kind(422, { name: 'validation_error', message: 'a@b.co is invalid' })
+  assert.ok(!JSON.stringify(leak).includes('a@b.co'), 'never keeps the message text')
+})
+
+test('tracking tokens: the same for every attempt of one email, different for every email; idempotency keys likewise', () => {
+  const secret = 'x'.repeat(40)
+  assert.match(emailToken(secret, 7), /^[0-9a-f]{64}$/)
+  assert.equal(emailToken(secret, 7), emailToken(secret, 7), 'retry: same link')
+  assert.notEqual(emailToken(secret, 7), emailToken(secret, 8), 'another email: another link')
+  assert.notEqual(emailToken(secret, 7), emailToken('y'.repeat(40), 7), 'another environment: another link')
+  assert.throws(() => emailToken('short', 7), /EMAIL_LINK_SECRET/)
+  assert.equal(idempotencyKey(secret, 7), idempotencyKey(secret, 7))
+  assert.notEqual(idempotencyKey(secret, 7), idempotencyKey('y'.repeat(40), 7), 'staging and production never collide')
+  assert.match(idempotencyKey(secret, 7), /^foundora-[0-9a-f]{16}-outbox-7$/)
+  assert.ok(!idempotencyKey(secret, 7).includes(secret.slice(0, 8)))
 })
 
 test('allowlist: exact addresses and @domains, case-insensitive input', () => {
@@ -103,19 +144,27 @@ test('retries wait 1, 5, 15, 60 then 360 minutes; 6 attempts at most', () => {
   assert.equal(MAX_ATTEMPTS, 6)
 })
 
-test('configuration: off by default; live needs an API key, sender, https address', () => {
+const LINK = 'L'.repeat(40)
+test('configuration: off by default; live needs a Resend key, the link secret, a sender and an https address', () => {
   assert.equal(readConfig({}).mode, 'off')
   assert.deepEqual(readConfig({}).problems, [])
   const p = readConfig({ EMAIL_MODE: 'live' }).problems.join(' | ')
-  assert.match(p, /BREVO_API_KEY is not set/)
+  assert.match(p, /RESEND_API_KEY is not set/)
+  assert.match(p, /EMAIL_LINK_SECRET/)
   assert.match(p, /EMAIL_FROM/)
   assert.match(p, /PUBLIC_BASE_URL/)
   assert.match(readConfig({ EMAIL_MODE: 'loud' }).problems.join(), /EMAIL_MODE must be/)
-  const good = readConfig({ EMAIL_MODE: 'live', BREVO_API_KEY: 'xkeysib-x', EMAIL_FROM: 'Notifications@Foundora.co.uk',
-    PUBLIC_BASE_URL: 'https://web-staging-003c.up.railway.app/', EMAIL_ALLOWLIST: 'me@example.com', RAILWAY_ENVIRONMENT_NAME: 'staging' })
+  const ok = { EMAIL_MODE: 'live', RESEND_API_KEY: 're_abcdefgh123', EMAIL_LINK_SECRET: LINK, EMAIL_FROM: 'Notifications@Foundora.co.uk',
+    PUBLIC_BASE_URL: 'https://web-staging-003c.up.railway.app/', EMAIL_ALLOWLIST: 'me@example.com', RAILWAY_ENVIRONMENT_NAME: 'staging' }
+  const good = readConfig(ok)
   assert.deepEqual(good.problems, [])
   assert.equal(good.from.email, 'notifications@foundora.co.uk')
   assert.equal(good.baseUrl, 'https://web-staging-003c.up.railway.app')
+  assert.equal(good.linkSecret, LINK)
+  assert.match(readConfig({ ...ok, RESEND_API_KEY: 'xkeysib-abc' }).problems.join(), /does not look like a Resend API key/)
+  assert.match(readConfig({ ...ok, EMAIL_LINK_SECRET: 'short' }).problems.join(), /EMAIL_LINK_SECRET must be at least 32/)
+  assert.match(readConfig({ ...ok, BREVO_API_KEY: 'xkeysib-old' }).problems.join(), /BREVO_API_KEY is still set/)
+  assert.ok(!readConfig({ ...ok, RESEND_API_KEY: 'bad-key-value' }).problems.join().includes('bad-key-value'), 'never prints values')
 })
 
 test('the email log masks addresses', () => {
